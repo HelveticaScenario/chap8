@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::io::Read;
 use std::env;
 
 #[derive(Default)]
@@ -28,8 +29,21 @@ impl Default for Computer {
      }
 }
 
-impl Computer {
+fn combine(arr: &[u8]) -> u16 {
+    let mut val: u16 = 0;
+    for v in arr {
+        val <<= 4;
+        val += *v as u16;
+    }
+    val
+}
 
+impl Computer {
+    fn ld_i_addr(&mut self, inst: &[u8; 4]) {
+        let addr = combine(&inst[1..]);
+        println!("addr is {:x}", addr);
+        self.cpu.i = addr;
+    }
 }
 
 // cargo run -- ./games/TANK
@@ -38,13 +52,64 @@ fn main() {
     let mut computer : Computer = Default::default();
     computer.cpu.pc = 0x200;
     let mut f = File::open(env::args().nth(1).unwrap()).unwrap();
-    {
-        let mut slice = &mut computer.ram[0x200..];
-        slice[0] = 55u8;
-    }
-    println!("{:?}", computer.ram[0x200]);
-    
 
-    
+    {
+        let end : usize = 0x200 + f.metadata().unwrap().len() as usize;
+        let mut slice = &mut computer.ram[0x200..end];
+        f.read_exact(slice);
+    }
+    println!("{:x}", computer.ram[0x200]);
+
+    loop {
+        let mut should_inc = true;
+
+        let inst : [u8; 4] = {
+            let inst0 = computer.ram[computer.cpu.pc as usize];
+            let inst1 = computer.ram[(computer.cpu.pc + 1) as usize];
+
+            let tet0 = inst0 >> 4;
+            let tet1 = 0x0f & inst0;
+            let tet2 = inst1 >> 4;
+            let tet3 = 0x0f & inst1;
+
+            [tet0, tet1, tet2, tet3]
+        };
+
+        print!("inst ");
+        for x in &inst {
+            print!("{:x}", x);
+        }
+        println!();
+
+        match inst[0] {
+            0xa => computer.ld_i_addr(&inst),
+            _ => panic!("unimplemented instruction: {:x}", inst[0])
+        }
+        println!("i is {:x}", computer.cpu.i);
+
+        break;
+    }
+
     println!("Hello, world!");
+}
+
+#[test]
+fn combine_test1() {
+    let inst = [0x1, 0x2, 0x3];
+    let combo = combine(&inst);
+    assert!(0x123 == combo);
+}
+
+#[test]
+fn combine_test2() {
+    let inst = [0x3];
+    let combo = combine(&inst);
+    assert!(0x3 == combo);
+}
+
+#[test]
+fn combine_test3() {
+    let inst = [0x1, 0x2, 0x3, 0x4];
+    let combo = combine(&inst);
+    assert!(0x1234 == combo);
 }
