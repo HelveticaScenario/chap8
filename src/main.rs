@@ -7,11 +7,19 @@ extern crate rand;
 extern crate serde;
 extern crate serde_yaml;
 
+extern crate ansi_term;
+
 use std::fs::File;
 use std::io::Read;
 use std::io;
 use std::env;
 use std::fmt;
+use ansi_term::Colour::RGB;
+
+const OFF_COLOR: ansi_term::Colour = RGB(153, 102, 0);
+const ON_COLOR: ansi_term::Colour = RGB(255, 204, 0);
+const OFF_PIXEL: &'static str = "   ";
+const ON_PIXEL: &'static str = "   ";
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -26,21 +34,21 @@ struct CPU {
 
 impl fmt::Debug for CPU {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "v : ");
+        write!(f, "v : ").unwrap();
         for v in &self.v {
-            write!(f, "{:x}, ", v);
+            write!(f, "{:x}, ", v).unwrap();
         }
-        write!(f, "\n");
+        write!(f, "\n").unwrap();
 
-        write!(f, "i : {:x}\n", self.i);
-        write!(f, "dt: {:x}\n", self.dt);
-        write!(f, "st: {:x}\n", self.st);
-        write!(f, "pc: {:x}\n", self.pc);
-        write!(f, "sp: {:x}\n", self.sp);
+        write!(f, "i : {:x}\n", self.i).unwrap();
+        write!(f, "dt: {:x}\n", self.dt).unwrap();
+        write!(f, "st: {:x}\n", self.st).unwrap();
+        write!(f, "pc: {:x}\n", self.pc).unwrap();
+        write!(f, "sp: {:x}\n", self.sp).unwrap();
 
-        write!(f, "sk: ");
+        write!(f, "sk: ").unwrap();
         for s in &self.stack {
-            write!(f, "{:x}, ", s);
+            write!(f, "{:x}, ", s).unwrap();
         }
         write!(f, "")
     }
@@ -71,6 +79,22 @@ fn combine(arr: &[u8]) -> u16 {
     val
 }
 
+// fn expand(byte: u8) -> Vec<bool> {
+//     let mut ret = Vec::new();
+// }
+
+// fn flip_bit(byte: u8, addr: u8) -> (u8, bool) {
+//     let old = get_bit(byte, addr);
+//     byte ^= 1 << addr;
+//     let new = get_bit(byte, addr);
+    
+//     return (byte, old == true && new == false);
+// }
+
+// fn get_bit(byte: u8, addr: u8) -> bool {
+//     return ((byte >> addr) & 1) != 0;
+// }
+
 impl Computer {
     fn ld_i_addr(&mut self, inst: &[u8; 4]) {
         let addr = combine(&inst[1..]);
@@ -91,6 +115,49 @@ impl Computer {
             self.cpu.pc += 2;
         }
     }
+
+    fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
+        let x = self.cpu.v[inst[1] as usize];
+        let y = self.cpu.v[inst[2] as usize];
+        let n = inst[3] as u8;
+        let mut sprite: Vec<u8> = Vec::new();
+        // sprite.reserve_exact(n as usize);
+        sprite.extend_from_slice(&self.ram[(self.cpu.i as usize)..((self.cpu.i+(n as u16)) as usize)]);
+        let offset: u8 = x % 8;
+        let mut collided = false;
+        for i in 0..n {
+            let first_byte: usize = (((y + i) * 8) + (x / 8)) as usize;
+            let second_byte: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize;
+
+            let mut shift: u8 = sprite[i as usize] >> offset;
+            collided = collided || ((shift & self.ram[first_byte]) != 0);
+            self.ram[first_byte] ^= shift;
+
+            shift = sprite[i as usize] << (7 - offset);
+            collided = collided || ((shift & self.ram[second_byte]) != 0);
+            self.ram[second_byte] ^= shift;
+        }
+        self.cpu.v[0xf] = if collided { 1 } else { 0 };
+    }
+}
+
+
+
+
+fn draw_screen(screen: &[u8]) {
+    for i in 0..32 {
+        for j in 0..8 {
+            let byte = screen[i*j];
+            for k in 0..8 {
+                if ((byte >> k) & 1) != 0 {
+                    print!("{}", OFF_COLOR.on(ON_COLOR).paint(ON_PIXEL));
+                } else {
+                    print!("{}", ON_COLOR.on(OFF_COLOR).paint(OFF_PIXEL));
+                }
+            }
+        }
+        println!("");
+    }
 }
 
 // cargo run -- ./games/TANK
@@ -103,8 +170,10 @@ fn main() {
     {
         let end: usize = 0x200 + f.metadata().unwrap().len() as usize;
         let mut slice = &mut computer.ram[0x200..end];
-        f.read_exact(slice);
+        f.read_exact(slice).unwrap();
     }
+
+    let offset = computer.ram.len() - 256 - 1;
 
     loop {
         let mut should_inc = true;
@@ -121,12 +190,9 @@ fn main() {
             [tet0, tet1, tet2, tet3]
         };
 
-        print!("inst: ");
-        for x in &inst {
-            print!("{:x}", x);
-        }
+        
 
-        let mut inst_name = "";
+        let inst_name: &str;
 
         match inst[0] {
             0x3 => {
@@ -141,9 +207,17 @@ fn main() {
                 inst_name = "rnd_vx_byte";
                 computer.rnd_vx_byte(&inst);
             },
+            0xd => {
+                inst_name = "drw_vx_vy_nibble";
+                computer.drw_vx_vy_nibble(&inst);
+                draw_screen(&computer.ram[offset..]);
+            }
             _ => panic!("unimplemented instruction: {:x}", inst[0])
         }
-
+        print!("inst: ");
+        for x in &inst {
+            print!("{:x}", x);
+        }
         println!(" ({})", inst_name);
 
         if should_inc {
@@ -154,7 +228,7 @@ fn main() {
 
         // step on newline
         let mut input = String::new();
-        io::stdin().read_line(&mut input);
+        io::stdin().read_line(&mut input).unwrap();
     }
 }
 
