@@ -117,6 +117,7 @@ impl Computer {
     }
 
     fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
+        let screen_start: usize = self.ram.len() - 256 - 1;
         let x = self.cpu.v[inst[1] as usize];
         let y = self.cpu.v[inst[2] as usize];
         let n = inst[3] as u8;
@@ -126,8 +127,8 @@ impl Computer {
         let offset: u8 = x % 8;
         let mut collided = false;
         for i in 0..n {
-            let first_byte: usize = (((y + i) * 8) + (x / 8)) as usize;
-            let second_byte: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize;
+            let first_byte: usize = (((y + i) * 8) + (x / 8)) as usize + screen_start;
+            let second_byte: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize + screen_start;
 
             let mut shift: u8 = sprite[i as usize] >> offset;
             collided = collided || ((shift & self.ram[first_byte]) != 0);
@@ -159,7 +160,7 @@ impl Computer {
 fn draw_screen(screen: &[u8]) {
     for i in 0..32 {
         for j in 0..8 {
-            let byte = screen[i*j];
+            let byte = screen[(i * 8) + j];
             for k in 0..8 {
                 if ((byte >> k) & 1) != 0 {
                     print!("{}", OFF_COLOR.on(ON_COLOR).paint(ON_PIXEL));
@@ -170,6 +171,7 @@ fn draw_screen(screen: &[u8]) {
         }
         println!("");
     }
+    println!("");
 }
 
 // cargo run -- ./games/TANK
@@ -239,21 +241,21 @@ fn main() {
             }
             _ => panic!("unimplemented instruction: {:x}", inst[0])
         }
-        print!("inst: ");
-        for x in &inst {
-            print!("{:x}", x);
-        }
-        println!(" ({})", inst_name);
+        // print!("inst: ");
+        // for x in &inst {
+        //     print!("{:x}", x);
+        // }
+        // println!(" ({})", inst_name);
 
         if should_inc {
             computer.cpu.pc += 2;
         }
 
-        println!("{:?}", computer.cpu);
+        // println!("{:?}", computer.cpu);
 
         // step on newline
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        // let mut input = String::new();
+        // io::stdin().read_line(&mut input).unwrap();
     }
 }
 
