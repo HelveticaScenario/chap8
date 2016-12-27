@@ -18,13 +18,19 @@ use std::env;
 use std::fmt;
 use ansi_term::Colour::RGB;
 
+use std::time::Duration;
+
 use rustbox::{Color, RustBox, OutputMode};
+use rustbox::Color::Byte;
 use rustbox::Key;
 
 const OFF_COLOR: ansi_term::Colour = RGB(153, 102, 0);
 const ON_COLOR: ansi_term::Colour = RGB(255, 204, 0);
-const OFF_PIXEL: &'static str = "...";
-const ON_PIXEL: &'static str = "###";
+const OFF_COLOR_BOX: rustbox::Color = Byte(130u16);
+const ON_COLOR_BOX: rustbox::Color = Byte(148u16);
+const PIXEL_WIDTH: usize = 3;
+const OFF_PIXEL: char = '.';
+const ON_PIXEL: char = '#';
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -206,20 +212,41 @@ impl Computer {
 
 
 fn draw_screen(screen: &[u8]) {
-    for i in 0..32 {
-        for j in 0..8 {
-            let byte = screen[(i * 8) + j];
-            for k in 0..8 {
-                if ((byte >> k) & 1) != 0 {
-                    print!("{}", OFF_COLOR.on(ON_COLOR).paint(ON_PIXEL));
-                } else {
-                    print!("{}", ON_COLOR.on(OFF_COLOR).paint(OFF_PIXEL));
+
+    for y in 0..32 {
+        for x in 0..8 {
+            let byte = screen[(y * 8) + x];
+            for bit in 0..8 {
+                for i in 0..PIXEL_WIDTH {
+                    if ((byte >> bit) & 1) != 0 {
+                        print!("{}", OFF_COLOR.on(ON_COLOR).paint(ON_PIXEL.to_string()));
+                    } else {
+                        print!("{}", ON_COLOR.on(OFF_COLOR).paint(OFF_PIXEL.to_string()));
+                    }
                 }
             }
         }
         println!("");
     }
     println!("");
+}
+
+fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) { 
+    for y in 0..32 {
+        for x in 0..8 {
+            let byte = screen[(y * 8) + x];
+            for bit in 0..8 {
+                for i in 0..PIXEL_WIDTH {
+                    if ((byte >> bit) & 1) != 0 {
+                        rustbox.print_char((((x * 8) + bit) * PIXEL_WIDTH) + i, y, rustbox::RB_NORMAL, ON_COLOR_BOX, ON_COLOR_BOX, ON_PIXEL);
+                    } else {
+                        rustbox.print_char((((x * 8) + bit) * PIXEL_WIDTH) + i, y, rustbox::RB_NORMAL, OFF_COLOR_BOX, OFF_COLOR_BOX, OFF_PIXEL);
+                    }
+                }
+            }
+        }
+    }
+    rustbox.present();
 }
 
 // cargo run -- ./games/TANK
@@ -244,11 +271,10 @@ fn main() {
     rustbox.set_output_mode(OutputMode::EightBit);
 
     loop {
-        match rustbox.poll_event(true) {
+        match rustbox.peek_event(Duration::from_millis(0), false) {
             Ok(rustbox::Event::KeyEvent(key)) => {
                 match key {
                     Key::Char('q') => { break; }
-                    Key::Char(' ') => { }
                     _ => { }
                 }
             },
@@ -341,20 +367,8 @@ fn main() {
                 inst_name = "drw_vx_vy_nibble";
                 computer.drw_vx_vy_nibble(&inst);
                 let screen = &computer.ram[offset..];
-                for y in 0..32 {
-                    for x in 0..8 {
-                        let byte = screen[(y * 8) + x];
-                        for bit in 0..8 {
-                            if ((byte >> bit) & 1) != 0 {
-                                rustbox.print((x * 8) + bit, y, rustbox::RB_NORMAL, Color::Yellow, Color::Yellow, ON_PIXEL);
-                            } else {
-                                rustbox.print((x * 8) + bit, y, rustbox::RB_NORMAL, Color::Green, Color::Green, OFF_PIXEL);
-                            }
-                        }
-                    }
-                }
-                rustbox.present();
-                // draw_screen(&computer.ram[offset..]);
+                draw_screen_rustbox(screen, &rustbox);
+                // draw_screen(screen);
             },
             0xf => {
                 match combine(&inst[2..]) {
