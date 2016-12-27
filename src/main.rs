@@ -11,6 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::io;
 use std::env;
+use std::fmt;
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -21,6 +22,28 @@ struct CPU {
     pc: u16,
     sp: u8,
     stack: [u16; 16],
+}
+
+impl fmt::Debug for CPU {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "v : ");
+        for v in &self.v {
+            write!(f, "{:x}, ", v);
+        }
+        write!(f, "\n");
+
+        write!(f, "i : {:x}\n", self.i);
+        write!(f, "dt: {:x}\n", self.dt);
+        write!(f, "st: {:x}\n", self.st);
+        write!(f, "pc: {:x}\n", self.pc);
+        write!(f, "sp: {:x}\n", self.sp);
+
+        write!(f, "sk: ");
+        for s in &self.stack {
+            write!(f, "{:x}, ", s);
+        }
+        write!(f, "")
+    }
 }
 
 
@@ -98,25 +121,36 @@ fn main() {
             [tet0, tet1, tet2, tet3]
         };
 
-        print!("inst ");
+        print!("inst: ");
         for x in &inst {
             print!("{:x}", x);
         }
-        println!();
+
+        let mut inst_name = "";
 
         match inst[0] {
-            0x3 => computer.se_vx_byte(&inst),
-            0xa => computer.ld_i_addr(&inst),
-            0xc => computer.rnd_vx_byte(&inst),
+            0x3 => {
+                inst_name = "set_vx_byte";
+                computer.se_vx_byte(&inst);
+            },
+            0xa => {
+                inst_name = "ld_i_addr";
+                computer.ld_i_addr(&inst);
+            },
+            0xc => {
+                inst_name = "rnd_vx_byte";
+                computer.rnd_vx_byte(&inst);
+            },
             _ => panic!("unimplemented instruction: {:x}", inst[0])
         }
+
+        println!(" ({})", inst_name);
 
         if should_inc {
             computer.cpu.pc += 2;
         }
 
-        let serialized = serde_yaml::to_string(&computer.cpu).unwrap();
-        println!("{}", serialized);
+        println!("{:?}", computer.cpu);
 
         // step on newline
         let mut input = String::new();
