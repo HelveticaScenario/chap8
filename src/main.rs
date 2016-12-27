@@ -18,8 +18,8 @@ use ansi_term::Colour::RGB;
 
 const OFF_COLOR: ansi_term::Colour = RGB(153, 102, 0);
 const ON_COLOR: ansi_term::Colour = RGB(255, 204, 0);
-const OFF_PIXEL: &'static str = "   ";
-const ON_PIXEL: &'static str = "   ";
+const OFF_PIXEL: &'static str = "...";
+const ON_PIXEL: &'static str = "###";
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -139,9 +139,21 @@ impl Computer {
         }
         self.cpu.v[0xf] = if collided { 1 } else { 0 };
     }
+
+    fn add_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        self.cpu.v[inst[1] as usize] += kk;
+    }
+
+    fn jmp_addr(&mut self, inst: &[u8; 4]) {
+        self.cpu.pc = combine(&inst[1..]) as u16;
+    }
+
+    fn ld_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        self.cpu.v[inst[1] as usize] = kk;
+    }
 }
-
-
 
 
 fn draw_screen(screen: &[u8]) {
@@ -211,6 +223,19 @@ fn main() {
                 inst_name = "drw_vx_vy_nibble";
                 computer.drw_vx_vy_nibble(&inst);
                 draw_screen(&computer.ram[offset..]);
+            },
+            0x7 => {
+                inst_name = "add_vx_byte";
+                computer.add_vx_byte(&inst);
+            },
+            0x1 => {
+                inst_name = "jmp_addr";
+                computer.jmp_addr(&inst);
+                should_inc = false;
+            },
+            0x6 => {
+                inst_name = "ld_vx_byte";
+                computer.ld_vx_byte(&inst);
             }
             _ => panic!("unimplemented instruction: {:x}", inst[0])
         }
