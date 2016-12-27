@@ -1,3 +1,5 @@
+extern crate rand;
+
 use std::fs::File;
 use std::io::Read;
 use std::env;
@@ -43,6 +45,13 @@ impl Computer {
         let addr = combine(&inst[1..]);
         println!("addr is {:x}", addr);
         self.cpu.i = addr;
+    }
+
+    fn rnd_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        let random_byte = rand::random::<u8>();
+        let byte : u8 = kk & random_byte;
+        self.cpu.v[inst[1] as usize] = byte;
     }
 }
 
