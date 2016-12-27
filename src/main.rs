@@ -1,4 +1,6 @@
-#![feature(proc_macro)]
+#![feature(proc_macro, core)]
+
+extern crate rustbox;
 
 #[macro_use]
 extern crate serde_derive;
@@ -15,6 +17,9 @@ use std::io;
 use std::env;
 use std::fmt;
 use ansi_term::Colour::RGB;
+
+use rustbox::{Color, RustBox, OutputMode};
+use rustbox::Key;
 
 const OFF_COLOR: ansi_term::Colour = RGB(153, 102, 0);
 const ON_COLOR: ansi_term::Colour = RGB(255, 204, 0);
@@ -189,7 +194,25 @@ fn main() {
 
     let offset = computer.ram.len() - 256 - 1;
 
+    let mut rustbox = match RustBox::init(Default::default()) {
+        Result::Ok(v) => v,
+        Result::Err(e) => panic!("{}", e),
+    };
+    rustbox.set_output_mode(OutputMode::EightBit);
+
     loop {
+        match rustbox.poll_event(true) {
+            Ok(rustbox::Event::KeyEvent(key)) => {
+                match key {
+                    Key::Char('q') => { break; }
+                    Key::Char(' ') => { }
+                    _ => { }
+                }
+            },
+            Err(e) => panic!("{}", e),
+            _ => { }
+        }
+
         let mut should_inc = true;
 
         let inst: [u8; 4] = {
@@ -224,7 +247,21 @@ fn main() {
             0xd => {
                 inst_name = "drw_vx_vy_nibble";
                 computer.drw_vx_vy_nibble(&inst);
-                draw_screen(&computer.ram[offset..]);
+                let screen = &computer.ram[offset..];
+                for y in 0..32 {
+                    for x in 0..8 {
+                        let byte = screen[(y * 8) + x];
+                        for bit in 0..8 {
+                            if ((byte >> bit) & 1) != 0 {
+                                rustbox.print((x * 8) + bit, y, rustbox::RB_NORMAL, Color::Yellow, Color::Yellow, ON_PIXEL);
+                            } else {
+                                rustbox.print((x * 8) + bit, y, rustbox::RB_NORMAL, Color::Green, Color::Green, OFF_PIXEL);
+                            }
+                        }
+                    }
+                }
+                rustbox.present();
+                // draw_screen(&computer.ram[offset..]);
             },
             0x7 => {
                 inst_name = "add_vx_byte";
