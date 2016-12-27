@@ -1,10 +1,18 @@
+#![feature(proc_macro)]
+
+#[macro_use]
+extern crate serde_derive;
+
 extern crate rand;
+extern crate serde;
+extern crate serde_yaml;
 
 use std::fs::File;
 use std::io::Read;
+use std::io;
 use std::env;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct CPU {
     v: [u8; 16],
     i: u16,
@@ -43,36 +51,42 @@ fn combine(arr: &[u8]) -> u16 {
 impl Computer {
     fn ld_i_addr(&mut self, inst: &[u8; 4]) {
         let addr = combine(&inst[1..]);
-        println!("addr is {:x}", addr);
         self.cpu.i = addr;
     }
 
     fn rnd_vx_byte(&mut self, inst: &[u8; 4]) {
         let kk = combine(&inst[2..]) as u8;
         let random_byte = rand::random::<u8>();
-        let byte : u8 = kk & random_byte;
+        let byte: u8 = kk & random_byte;
         self.cpu.v[inst[1] as usize] = byte;
+    }
+
+    fn se_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        let vx = self.cpu.v[inst[1] as usize];
+        if kk == vx {
+            self.cpu.pc += 2;
+        }
     }
 }
 
 // cargo run -- ./games/TANK
 
 fn main() {
-    let mut computer : Computer = Default::default();
+    let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
     let mut f = File::open(env::args().nth(1).unwrap()).unwrap();
 
     {
-        let end : usize = 0x200 + f.metadata().unwrap().len() as usize;
+        let end: usize = 0x200 + f.metadata().unwrap().len() as usize;
         let mut slice = &mut computer.ram[0x200..end];
         f.read_exact(slice);
     }
-    println!("{:x}", computer.ram[0x200]);
 
     loop {
         let mut should_inc = true;
 
-        let inst : [u8; 4] = {
+        let inst: [u8; 4] = {
             let inst0 = computer.ram[computer.cpu.pc as usize];
             let inst1 = computer.ram[(computer.cpu.pc + 1) as usize];
 
@@ -91,15 +105,23 @@ fn main() {
         println!();
 
         match inst[0] {
+            0x3 => computer.se_vx_byte(&inst),
             0xa => computer.ld_i_addr(&inst),
+            0xc => computer.rnd_vx_byte(&inst),
             _ => panic!("unimplemented instruction: {:x}", inst[0])
         }
-        println!("i is {:x}", computer.cpu.i);
 
-        break;
+        if should_inc {
+            computer.cpu.pc += 2;
+        }
+
+        let serialized = serde_yaml::to_string(&computer.cpu).unwrap();
+        println!("{}", serialized);
+
+        // step on newline
+        let mut input = String::new();
+        io::stdin().read_line(&mut input);
     }
-
-    println!("Hello, world!");
 }
 
 #[test]
