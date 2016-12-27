@@ -116,6 +116,15 @@ impl Computer {
         }
     }
 
+    fn sne_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        let vx = self.cpu.v[inst[1] as usize];
+        if kk != vx {
+            self.cpu.pc += 2;
+        }
+    }
+
+
     fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
         let screen_start: usize = self.ram.len() - 256 - 1;
         let x = self.cpu.v[inst[1] as usize];
@@ -153,6 +162,40 @@ impl Computer {
     fn ld_vx_byte(&mut self, inst: &[u8; 4]) {
         let kk = combine(&inst[2..]) as u8;
         self.cpu.v[inst[1] as usize] = kk;
+    }
+
+    fn call_addr(&mut self, inst: &[u8; 4]) {
+        self.cpu.sp += 1;
+        self.cpu.stack[self.cpu.sp as usize] = self.cpu.pc;
+        self.cpu.pc = combine(&inst[1..]) as u16;
+    }
+
+    fn ret(&mut self, inst: &[u8; 4]) {
+        self.cpu.pc = self.cpu.stack[self.cpu.sp as usize];
+        self.cpu.sp -= 1;
+    }
+
+    fn and_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+        self.cpu.v[x] &= self.cpu.v[y];
+    }
+
+    fn ld_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+        self.cpu.v[x] = self.cpu.v[y];
+    }
+
+    fn sub_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+        self.cpu.v[x] -= self.cpu.v[y];
+    }
+
+    fn add_i_vx(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        self.cpu.i += self.cpu.v[x] as u16;
     }
 }
 
@@ -209,9 +252,59 @@ fn main() {
         let inst_name: &str;
 
         match inst[0] {
+            0x0 => {
+                match inst[3] {
+                    0xe => {
+                        inst_name = "ret";
+                        computer.ret(&inst);
+                    },
+                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3])
+                }
+            },
+            0x1 => {
+                inst_name = "jmp_addr";
+                computer.jmp_addr(&inst);
+                should_inc = false;
+            },
+            0x2 => {
+                inst_name = "call_addr";
+                computer.call_addr(&inst);
+                should_inc = false;
+            },
             0x3 => {
-                inst_name = "set_vx_byte";
+                inst_name = "se_vx_byte";
                 computer.se_vx_byte(&inst);
+            },
+            0x4 => {
+                inst_name = "sne_vx_byte";
+                computer.sne_vx_byte(&inst);
+            },
+            0x6 => {
+                inst_name = "ld_vx_byte";
+                computer.ld_vx_byte(&inst);
+            },
+            0x7 => {
+                inst_name = "add_vx_byte";
+                computer.add_vx_byte(&inst);
+            },
+            0x8 => {
+                match inst[3] {
+                    0x0 => {
+                        inst_name = "ld_vx_vy";
+                        computer.ld_vx_vy(&inst);
+                    },
+                    0x2 => {
+                        inst_name = "and_vx_vy";
+                        computer.and_vx_vy(&inst);
+                    },
+                    0x5 => {
+                        inst_name = "sub_vx_vy";
+                        computer.sub_vx_vy(&inst);
+                    }
+                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3])
+                }
             },
             0xa => {
                 inst_name = "ld_i_addr";
@@ -226,20 +319,18 @@ fn main() {
                 computer.drw_vx_vy_nibble(&inst);
                 draw_screen(&computer.ram[offset..]);
             },
-            0x7 => {
-                inst_name = "add_vx_byte";
-                computer.add_vx_byte(&inst);
+            0xf => {
+                match combine(&inst[2..]) {
+                    0x1e => {
+                        inst_name = "add_i_vx";
+                        computer.add_i_vx(&inst);
+                    },
+                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3])
+                }
             },
-            0x1 => {
-                inst_name = "jmp_addr";
-                computer.jmp_addr(&inst);
-                should_inc = false;
-            },
-            0x6 => {
-                inst_name = "ld_vx_byte";
-                computer.ld_vx_byte(&inst);
-            }
-            _ => panic!("unimplemented instruction: {:x}", inst[0])
+            _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        inst[0], inst[1], inst[2], inst[3])
         }
         // print!("inst: ");
         // for x in &inst {

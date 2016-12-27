@@ -6,24 +6,37 @@ def decode(inst):
     op = nibbles[0]
     args = nibbles[1:]
 
+    if op == 0x0:
+        if args[2] == 0xe:
+            return "ret"
+    if op == 0x1:
+        return "jmp_addr({:x}{:x}{:x})".format(*args)
+    if op == 0x2:
+        return "call_addr({:x}{:x}{:x})".format(*args)
     if op == 0x3:
         return "se_vx_byte({:x}, {:x}{:x})".format(*args)
+    if op == 0x4:
+        return "sne_vx_byte({:x}, {:x}{:x})".format(*args)
+    if op == 0x6:
+        return "ld_vx_byte({:x}, {:x}{:x})".format(*args)
+    if op == 0x7:
+        return "add_vx_byte({:x}, {:x}{:x})".format(*args)
+    if op == 0x8:
+        if args[2] == 0x0:
+            return "ld_vx_vy({:x}, {:x})".format(*args[1:3])
+        if args[2] == 0x2:
+            return "and_vx_vy({:x}, {:x})".format(*args[1:3])
+        if args[2] == 0x5:
+            return "sub_vx_vy({:x}, {:x})".format(*args[1:3])
     if op == 0xa:
         return "ld_i_addr({:x}{:x}{:x})".format(*args)
     if op == 0xc:
         return "rnd_vx_byte({:x}, {:x}{:x})".format(*args)
     if op == 0xd:
         return "drw_vx_vy_nibble({:x}, {:x}, {:x})".format(*args)
-    if op == 0x7:
-        return "add_vx_byte({:x}, {:x}{:x})".format(*args)
-    if op == 0x1:
-        return "jmp_addr({:x}{:x}{:x})".format(*args)
-    if op == 0x6:
-        return "ld_vx_byte({:x}, {:x}{:x})".format(*args)
-    if op == 0x8 and args[2] == 0x0:
-        return "ld_vx_vy({:x}, {:x})".format(*args[1:3])
-    if op == 0x2:
-        return "call_addr({:x}{:x}{:x})".format(*args)
+    if op == 0xf:
+        if args[2] == 0xe:
+            return "add_i_vx({:x})".format(args[1])
     else:
         return "INVALID"
 
