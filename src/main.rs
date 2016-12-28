@@ -131,14 +131,6 @@ impl Computer {
         self.cpu.v[inst[1] as usize] = byte;
     }
 
-    fn se_vx_byte(&mut self, inst: &[u8; 4]) {
-        let kk = combine(&inst[2..]) as u8;
-        let vx = self.cpu.v[inst[1] as usize];
-        if kk == vx {
-            self.cpu.pc += 2;
-        }
-    }
-
     fn sne_vx_byte(&mut self, inst: &[u8; 4]) {
         let kk = combine(&inst[2..]) as u8;
         let vx = self.cpu.v[inst[1] as usize];
@@ -147,6 +139,21 @@ impl Computer {
         }
     }
 
+    fn se_vx_byte(&mut self, inst: &[u8; 4]) {
+        let kk = combine(&inst[2..]) as u8;
+        let vx = self.cpu.v[inst[1] as usize];
+        if kk == vx {
+            self.cpu.pc += 2;
+        }
+    }
+
+    fn se_vx_vy(&mut self, inst: &[u8; 4]) {
+        let vx = self.cpu.v[inst[1] as usize];
+        let vy = self.cpu.v[inst[2] as usize];
+        if vx == vy {
+            self.cpu.pc += 2;
+        }
+    }
 
     fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
         let screen_start: usize = self.ram.len() - 256 - 1;
@@ -523,6 +530,10 @@ fn main() {
                 inst_name = "sne_vx_byte";
                 computer.sne_vx_byte(&inst);
             },
+            0x5 => {
+                inst_name = "se_vx_vy";
+                computer.se_vx_vy(&inst);
+            },
             0x6 => {
                 inst_name = "ld_vx_byte";
                 computer.ld_vx_byte(&inst);
@@ -581,6 +592,7 @@ fn main() {
                 inst_name = "ld_i_addr";
                 computer.ld_i_addr(&inst);
             },
+            // need 0xb
             0xc => {
                 inst_name = "rnd_vx_byte";
                 computer.rnd_vx_byte(&inst);
@@ -592,15 +604,20 @@ fn main() {
                 draw_screen_rustbox(screen, &rustbox);
                 // draw_screen(screen);
             },
+            // need exa1
+            // need ex9e
             0xf => {
                 match combine(&inst[2..]) {
-                    0x1e => {
-                        inst_name = "add_i_vx";
-                        computer.add_i_vx(&inst);
-                    },
+                    // need 07
                     0x0a => {
                         inst_name = "ld_vx_k";
                         computer.ld_vx_k(&inst, &rustbox);
+                    },
+                    // need 15
+                    // need 18
+                    0x1e => {
+                        inst_name = "add_i_vx";
+                        computer.add_i_vx(&inst);
                     },
                     0x29 => {
                         inst_name = "lf_f_vx";
