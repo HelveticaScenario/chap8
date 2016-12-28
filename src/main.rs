@@ -624,7 +624,7 @@ fn main() {
                 match combine(&inst[2..]) {
                     0x07 => {
                         inst_name = "ld_vx_dt";
-                        computer.ld_vx_dt(&inst, &rustbox);
+                        computer.ld_vx_dt(&inst);
                     },
                     0x0a => {
                         inst_name = "ld_vx_k";
