@@ -73,8 +73,6 @@ impl fmt::Debug for CPU {
     }
 }
 
-
-// #[derive(Default)]
 struct Computer {
     ram: [u8; 4096],
     cpu: CPU,
@@ -97,22 +95,6 @@ fn combine(arr: &[u8]) -> u16 {
     }
     val
 }
-
-// fn expand(byte: u8) -> Vec<bool> {
-//     let mut ret = Vec::new();
-// }
-
-// fn flip_bit(byte: u8, addr: u8) -> (u8, bool) {
-//     let old = get_bit(byte, addr);
-//     byte ^= 1 << addr;
-//     let new = get_bit(byte, addr);
-    
-//     return (byte, old == true && new == false);
-// }
-
-// fn get_bit(byte: u8, addr: u8) -> bool {
-//     return ((byte >> addr) & 1) != 0;
-// }
 
 impl Computer {
     fn ld_i_addr(&mut self, inst: &[u8; 4]) {
@@ -150,21 +132,21 @@ impl Computer {
         let y = self.cpu.v[inst[2] as usize];
         let n = inst[3] as u8;
         let mut sprite: Vec<u8> = Vec::new();
-        // sprite.reserve_exact(n as usize);
         sprite.extend_from_slice(&self.ram[(self.cpu.i as usize)..((self.cpu.i+(n as u16)) as usize)]);
-        let offset: u8 = x % 8;
+        let offset: u8 = (x % 8);
         let mut collided = false;
         for i in 0..n {
-            let first_byte: usize = (((y + i) * 8) + (x / 8)) as usize + screen_start;
-            let second_byte: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize + screen_start;
+            let first_byte_i: usize = (((y + i) * 8) + (x / 8)) as usize + screen_start;
+            let second_byte_i: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize + screen_start;
 
-            let mut shift: u8 = sprite[i as usize] >> offset;
-            collided = collided || ((shift & self.ram[first_byte]) != 0);
-            self.ram[first_byte] ^= shift;
+            let byte: u8 = sprite[i as usize];
+            let first_byte: u8=
+                if offset == 8 { 0 } else { byte.wrapping_shr(offset as u32) };
+            let second_byt: u8 =
+                if offset == 0 { 0 } else { byte.wrapping_shl((8 - offset) as u32)};
 
-            shift = sprite[i as usize] << (7 - offset);
-            collided = collided || ((shift & self.ram[second_byte]) != 0);
-            self.ram[second_byte] ^= shift;
+            collided = collided || ((first_byte & self.ram[first_byte_i]) != 0);
+            self.ram[first_byte_i] ^= first_byte;
         }
         self.cpu.v[0xf] = if collided { 1 } else { 0 };
     }
@@ -242,7 +224,11 @@ impl Computer {
                         Key::Char('v') => { 
                             key_char = key;
                             break;
-                        }
+                        },
+                        Key::Char('k') => {
+                            panic!("you pressed k");
+                            break;
+                        },
                         _ => { }
                     }
                 },
@@ -357,9 +343,13 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
             for bit in 0..8 {
                 for i in 0..PIXEL_WIDTH {
                     if ((byte >> bit) & 1) != 0 {
-                        rustbox.print_char((((x * 8) + bit) * PIXEL_WIDTH) + i, y, rustbox::RB_NORMAL, ON_COLOR_BOX, ON_COLOR_BOX, ON_PIXEL);
+                        rustbox.print_char(
+                            (((x * 8) + (7 - bit)) * PIXEL_WIDTH) + i, y,
+                            rustbox::RB_NORMAL, ON_COLOR_BOX, ON_COLOR_BOX, ON_PIXEL);
                     } else {
-                        rustbox.print_char((((x * 8) + bit) * PIXEL_WIDTH) + i, y, rustbox::RB_NORMAL, OFF_COLOR_BOX, OFF_COLOR_BOX, OFF_PIXEL);
+                        rustbox.print_char(
+                            (((x * 8) + (7 - bit)) * PIXEL_WIDTH) + i, y,
+                            rustbox::RB_NORMAL, OFF_COLOR_BOX, OFF_COLOR_BOX, OFF_PIXEL);
                     }
                 }
             }
@@ -367,8 +357,6 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
     }
     rustbox.present();
 }
-
-// cargo run -- ./games/TANK
 
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
