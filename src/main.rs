@@ -1,7 +1,5 @@
 #![feature(proc_macro)]
 
-extern crate rustbox;
-
 #[macro_use]
 extern crate log;
 extern crate log4rs;
@@ -16,7 +14,6 @@ extern crate serde_yaml;
 
 extern crate ansi_term;
 
-use std::error::Error;
 use std::default::Default;
 
 use std::fs::File;
@@ -24,17 +21,22 @@ use std::io::Read;
 use std::env;
 use std::fmt;
 
-use std::time::Duration;
+extern crate sdl2;
+use sdl2::render::Renderer;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::event::Event;
+use sdl2::EventPump;
+use sdl2::keyboard::Keycode;
 
-use rustbox::{RustBox, OutputMode};
-use rustbox::Color::Byte;
-use rustbox::Key;
+const ON_COLOR: Color = Color::RGB(255, 0, 0);
+const OFF_COLOR: Color = Color::RGB(0, 0, 0);
 
-const OFF_COLOR_BOX: rustbox::Color = Byte(130u16);
-const ON_COLOR_BOX: rustbox::Color = Byte(148u16);
-const PIXEL_WIDTH: usize = 3;
-const OFF_PIXEL: char = '.';
-const ON_PIXEL: char = '#';
+const WINDOW_WIDTH: u32 = 640;
+const WINDOW_HEIGHT: u32 = 320;
+
+const X_SCALE: u32 = WINDOW_WIDTH / 64;
+const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -287,43 +289,41 @@ impl Computer {
         self.cpu.i = self.cpu.i.wrapping_add(self.cpu.v[x] as u16);
     }
 
-    fn ld_vx_k(&mut self, inst: &[u8; 4], rustbox: &RustBox) {
-        let key_char: Key;
-        loop {
-            match rustbox.poll_event(false) {
-                Ok(rustbox::Event::KeyEvent(key)) => {
-                    match key {
-                        Key::Char('x') |
-                        Key::Char('1') |
-                        Key::Char('2') |
-                        Key::Char('3') |
-                        Key::Char('q') |
-                        Key::Char('w') |
-                        Key::Char('e') |
-                        Key::Char('a') |
-                        Key::Char('s') |
-                        Key::Char('d') |
-                        Key::Char('z') |
-                        Key::Char('c') |
-                        Key::Char('4') |
-                        Key::Char('r') |
-                        Key::Char('f') |
-                        Key::Char('v') => { 
-                            key_char = key;
-                            break;
-                        },
-                        Key::Char('k') => {
-                            panic!("you pressed k");
-                        },
-                        _ => { }
-                    }
-                },
-                Err(e) => {
-                    debug!("{}", e.description());
-                    panic!("{}", e.description());
-                },
-                _ => { }
-            };
+    fn ld_vx_k(&mut self, inst: &[u8; 4], event_pump: &mut EventPump) {
+        let key_char: Keycode;
+        'poll: loop {
+            for event in event_pump.poll_iter() {
+                match event {
+                    Event::KeyDown {keycode: Some(key), ..} => {
+                        match key {
+                            Keycode::X |
+                            Keycode::Num1 |
+                            Keycode::Num2 |
+                            Keycode::Num3 |
+                            Keycode::Q |
+                            Keycode::W |
+                            Keycode::E |
+                            Keycode::A |
+                            Keycode::S |
+                            Keycode::D |
+                            Keycode::Z |
+                            Keycode::C |
+                            Keycode::Num4 |
+                            Keycode::R |
+                            Keycode::F |
+                            Keycode::V => { 
+                                key_char = key;
+                                break 'poll;
+                            },
+                            Keycode::K => {
+                                panic!("you pressed k");
+                            },
+                            _ => { }
+                        }
+                    },
+                    _ => continue
+                }
+            }
         }
         let key_code: u8 = key_char_to_u8(key_char);
         if key_code >= 16 {
@@ -371,82 +371,47 @@ impl Computer {
     }
 }
 
-fn key_char_to_u8(key: Key) -> u8 {
+fn key_char_to_u8(key: Keycode) -> u8 {
     match key {
-        Key::Char('x') => { 
-            0
-        }
-        Key::Char('1') => { 
-            1
-        }
-        Key::Char('2') => { 
-            2
-        }
-        Key::Char('3') => { 
-            3
-        }
-        Key::Char('q') => { 
-            4
-        }
-        Key::Char('w') => { 
-            5
-        }
-        Key::Char('e') => { 
-            6
-        }
-        Key::Char('a') => { 
-            7
-        }
-        Key::Char('s') => { 
-            8
-        }
-        Key::Char('d') => { 
-            9
-        }
-        Key::Char('z') => { 
-            10
-        }
-        Key::Char('c') => { 
-            11
-        }
-        Key::Char('4') => { 
-            12
-        }
-        Key::Char('r') => { 
-            13
-        }
-        Key::Char('f') => { 
-            14
-        }
-        Key::Char('v') => { 
-            15
-        }
-        _ => { 
-            16
-        }
+        Keycode::X => 0,
+        Keycode::Num1 => 1,
+        Keycode::Num2 => 2,
+        Keycode::Num3 => 3,
+        Keycode::Q => 4,
+        Keycode::W => 5,
+        Keycode::E => 6,
+        Keycode::A => 7,
+        Keycode::S => 8,
+        Keycode::D => 9,
+        Keycode::Z => 10,
+        Keycode::C => 11,
+        Keycode::Num4 => 12,
+        Keycode::R => 13,
+        Keycode::F => 14,
+        Keycode::V => 15,
+        _ => 16
     }
 }
 
-fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) { 
-    for y in 0..32 {
-        for x in 0..8 {
-            let byte = screen[(y * 8) + x];
+fn draw_screen_sdl(screen: &[u8], renderer: &mut Renderer) { 
+    for row in 0..32 {
+        for col in 0..8 {
+            let byte = screen[(row * 8) + col];
             for bit in 0..8 {
-                for i in 0..PIXEL_WIDTH {
-                    if ((byte >> bit) & 1) != 0 {
-                        rustbox.print_char(
-                            (((x * 8) + (7 - bit)) * PIXEL_WIDTH) + i, y,
-                            rustbox::RB_NORMAL, ON_COLOR_BOX, ON_COLOR_BOX, ON_PIXEL);
-                    } else {
-                        rustbox.print_char(
-                            (((x * 8) + (7 - bit)) * PIXEL_WIDTH) + i, y,
-                            rustbox::RB_NORMAL, OFF_COLOR_BOX, OFF_COLOR_BOX, OFF_PIXEL);
-                    }
+                if ((byte >> bit) & 1) != 0 {
+                    renderer.set_draw_color(ON_COLOR);
+                } else {
+                    renderer.set_draw_color(OFF_COLOR);
                 }
+
+                let x: i32 = ((col * 8 + 7 - bit) * X_SCALE as usize) as i32;
+                let y: i32 = (row * Y_SCALE as usize) as i32;
+
+                renderer.fill_rect(Rect::new(x, y, X_SCALE, Y_SCALE)).unwrap();
             }
         }
     }
-    rustbox.present();
+    renderer.present();
 }
 
 fn unimplemented_panic(inst: &[u8; 4]) -> ! {
@@ -457,6 +422,25 @@ fn unimplemented_panic(inst: &[u8; 4]) -> ! {
 }
 
 fn main() {
+
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+
+    let window =
+        video_subsystem.window("rust-sdl2 demo: Video", WINDOW_WIDTH, WINDOW_HEIGHT)
+        .position_centered()
+        .opengl()
+        .build()
+        .unwrap();
+
+    let mut renderer = window.renderer().build().unwrap();
+
+    renderer.set_draw_color(Color::RGB(255, 0, 0));
+    renderer.clear();
+    renderer.present();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
     log_panics::init();
 
@@ -474,22 +458,18 @@ fn main() {
 
     let offset = computer.ram.len() - 256 - 1;
 
-    let mut rustbox = match RustBox::init(Default::default()) {
-        Result::Ok(v) => v,
-        Result::Err(e) => panic!("{}\n", e),
-    };
-    rustbox.set_output_mode(OutputMode::EightBit);
+    'main: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit {..} => break 'main,
 
-    loop {
-        match rustbox.peek_event(Duration::from_millis(1), false) {
-            Ok(rustbox::Event::KeyEvent(key)) => {
-                match key {
-                    Key::Char('k') => { break; }
-                    _ => { }
-                }
-            },
-            Err(e) => panic!("{}\n", e),
-            _ => { }
+                Event::KeyDown {keycode: Some(keycode), ..} => {
+                    if keycode == Keycode::K {
+                        break 'main
+                    }
+                },
+                _ => continue
+            }
         }
 
         let mut should_inc = true;
@@ -612,7 +592,8 @@ fn main() {
                 inst_name = "drw_vx_vy_nibble";
                 computer.drw_vx_vy_nibble(&inst);
                 let screen = &computer.ram[offset..];
-                draw_screen_rustbox(screen, &rustbox);
+                draw_screen_sdl(screen, &mut renderer);
+
             },
             // need exa1
             // need ex9e
@@ -621,7 +602,7 @@ fn main() {
                     // need 07
                     0x0a => {
                         inst_name = "ld_vx_k";
-                        computer.ld_vx_k(&inst, &rustbox);
+                        computer.ld_vx_k(&inst, &mut event_pump);
                     },
                     // need 15
                     // need 18

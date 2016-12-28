@@ -13,5 +13,5 @@ rustbox = "*"
 log = "*"
 log4rs = "*"
 log-panics = "*"
-sdl2 = "0.27"
+sdl2 = "*"
 
