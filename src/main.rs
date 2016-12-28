@@ -1,4 +1,4 @@
-#![feature(proc_macro, core)]
+#![feature(proc_macro)]
 
 extern crate rustbox;
 
@@ -21,19 +21,15 @@ use std::default::Default;
 
 use std::fs::File;
 use std::io::Read;
-use std::io;
 use std::env;
 use std::fmt;
-use ansi_term::Colour::RGB;
 
 use std::time::Duration;
 
-use rustbox::{Color, RustBox, OutputMode};
+use rustbox::{RustBox, OutputMode};
 use rustbox::Color::Byte;
 use rustbox::Key;
 
-const OFF_COLOR: ansi_term::Colour = RGB(153, 102, 0);
-const ON_COLOR: ansi_term::Colour = RGB(255, 204, 0);
 const OFF_COLOR_BOX: rustbox::Color = Byte(130u16);
 const ON_COLOR_BOX: rustbox::Color = Byte(148u16);
 const PIXEL_WIDTH: usize = 3;
@@ -133,7 +129,7 @@ impl Computer {
         let n = inst[3] as u8;
         let mut sprite: Vec<u8> = Vec::new();
         sprite.extend_from_slice(&self.ram[(self.cpu.i as usize)..((self.cpu.i+(n as u16)) as usize)]);
-        let offset: u8 = (x % 8);
+        let offset: u8 = x % 8;
         let mut collided = false;
         for i in 0..n {
             let first_byte_i: usize = (((y + i) * 8) + (x / 8)) as usize + screen_start;
@@ -142,11 +138,14 @@ impl Computer {
             let byte: u8 = sprite[i as usize];
             let first_byte: u8=
                 if offset == 8 { 0 } else { byte.wrapping_shr(offset as u32) };
-            let second_byt: u8 =
+            let second_byte: u8 =
                 if offset == 0 { 0 } else { byte.wrapping_shl((8 - offset) as u32)};
 
             collided = collided || ((first_byte & self.ram[first_byte_i]) != 0);
             self.ram[first_byte_i] ^= first_byte;
+
+            collided = collided || ((second_byte & self.ram[second_byte_i]) != 0);
+            self.ram[second_byte_i] ^= second_byte;
         }
         self.cpu.v[0xf] = if collided { 1 } else { 0 };
     }
@@ -172,7 +171,7 @@ impl Computer {
         self.cpu.pc = combine(&inst[1..]) as u16;
     }
 
-    fn ret(&mut self, inst: &[u8; 4]) {
+    fn ret(&mut self) {
         self.cpu.pc = self.cpu.stack[self.cpu.sp as usize];
         self.cpu.sp -= 1;
     }
@@ -227,7 +226,6 @@ impl Computer {
                         },
                         Key::Char('k') => {
                             panic!("you pressed k");
-                            break;
                         },
                         _ => { }
                     }
@@ -316,26 +314,6 @@ fn key_char_to_u8(key: Key) -> u8 {
     }
 }
 
-fn draw_screen(screen: &[u8]) {
-
-    for y in 0..32 {
-        for x in 0..8 {
-            let byte = screen[(y * 8) + x];
-            for bit in 0..8 {
-                for i in 0..PIXEL_WIDTH {
-                    if ((byte >> bit) & 1) != 0 {
-                        print!("{}", OFF_COLOR.on(ON_COLOR).paint(ON_PIXEL.to_string()));
-                    } else {
-                        print!("{}", ON_COLOR.on(OFF_COLOR).paint(OFF_PIXEL.to_string()));
-                    }
-                }
-            }
-        }
-        println!("");
-    }
-    println!("");
-}
-
 fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) { 
     for y in 0..32 {
         for x in 0..8 {
@@ -361,7 +339,6 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
     log_panics::init();
-    debug!("A FILE HAPPENED :O :O :O \n");
 
     let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
@@ -414,7 +391,7 @@ fn main() {
                 match inst[3] {
                     0xe => {
                         inst_name = "ret";
-                        computer.ret(&inst);
+                        computer.ret();
                     },
                     _ => {
                         error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
