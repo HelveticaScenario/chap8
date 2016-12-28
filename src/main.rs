@@ -182,16 +182,71 @@ impl Computer {
         self.cpu.v[x] &= self.cpu.v[y];
     }
 
+    fn or_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+        self.cpu.v[x] |= self.cpu.v[y];
+    }
+
+    fn xor_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+        self.cpu.v[x] ^= self.cpu.v[y];
+    }
+
     fn ld_vx_vy(&mut self, inst: &[u8; 4]) {
         let x = inst[1] as usize;
         let y = inst[2] as usize;
         self.cpu.v[x] = self.cpu.v[y];
     }
 
+    fn add_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+
+        // set vf if overflow occurs
+        self.cpu.v[0xf] =
+            if (self.cpu.v[x] as u16 + self.cpu.v[y] as u16) > 255 { 1 } else { 0 };
+
+        self.cpu.v[x] = self.cpu.v[x].wrapping_add(self.cpu.v[y]);
+    }
+
     fn sub_vx_vy(&mut self, inst: &[u8; 4]) {
         let x = inst[1] as usize;
         let y = inst[2] as usize;
+
+        // set vf if vx > vy
+        self.cpu.v[0xf] = if self.cpu.v[x] > self.cpu.v[y] { 1 } else { 0 };
+
         self.cpu.v[x] = self.cpu.v[x].wrapping_sub(self.cpu.v[y]);
+    }
+
+    fn shr_vx(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+
+        // set vf if vx is odd
+        self.cpu.v[0xf] = self.cpu.v[x] & 1;
+
+        self.cpu.v[x] >>= 1;
+    }
+
+    fn shl_vx(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+
+        // set vf if high order bit of vx is 1
+        self.cpu.v[0xf] = self.cpu.v[x] & 0x80;
+
+        self.cpu.v[x] <<= 1;
+    }
+
+    fn subn_vx_vy(&mut self, inst: &[u8; 4]) {
+        let x = inst[1] as usize;
+        let y = inst[2] as usize;
+
+        // set vf if vx > vy
+        self.cpu.v[0xf] = if self.cpu.v[y] > self.cpu.v[x] { 1 } else { 0 };
+
+        self.cpu.v[x] = self.cpu.v[y].wrapping_sub(self.cpu.v[x]);
     }
 
     fn add_i_vx(&mut self, inst: &[u8; 4]) {
@@ -450,13 +505,37 @@ fn main() {
                         inst_name = "ld_vx_vy";
                         computer.ld_vx_vy(&inst);
                     },
+                    0x1 => {
+                        inst_name = "or_vx_vy";
+                        computer.or_vx_vy(&inst);
+                    },
                     0x2 => {
                         inst_name = "and_vx_vy";
                         computer.and_vx_vy(&inst);
                     },
+                    0x3 => {
+                        inst_name = "xor_vx_vy";
+                        computer.xor_vx_vy(&inst);
+                    },
+                    0x4 => {
+                        inst_name = "add_vx_vy";
+                        computer.add_vx_vy(&inst);
+                    },
                     0x5 => {
                         inst_name = "sub_vx_vy";
                         computer.sub_vx_vy(&inst);
+                    },
+                    0x6 => {
+                        inst_name = "shr_vx";
+                        computer.shr_vx(&inst);
+                    },
+                    0x7 => {
+                        inst_name = "subn_vx_vy";
+                        computer.subn_vx_vy(&inst);
+                    },
+                    0xe => {
+                        inst_name = "shl_vx";
+                        computer.shl_vx(&inst);
                     },
                     _ => {
                         error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
