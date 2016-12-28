@@ -173,7 +173,6 @@ impl Computer {
         let kk = combine(&inst[2..]) as u8;
         let x = inst[1] as usize;
         self.cpu.v[x] = self.cpu.v[x].wrapping_add(kk);
-        
     }
 
     fn jmp_addr(&mut self, inst: &[u8; 4]) {
@@ -263,13 +262,13 @@ impl Computer {
     }
 
     fn ld_i_vx(&mut self, inst: &[u8; 4]) {
-        for i in 0..inst[1] {
+        for i in 0..(inst[1] + 1) {
             self.ram[(self.cpu.i + i as u16) as usize] = self.cpu.v[i as usize];
         }
     }
 
     fn ld_vx_i(&mut self, inst: &[u8; 4]) {
-        for i in 0..inst[1] {
+        for i in 0..(inst[1] + 1) {
             self.cpu.v[i as usize] = self.ram[(self.cpu.i + i as u16) as usize];
         }
     }
@@ -395,7 +394,7 @@ fn main() {
     rustbox.set_output_mode(OutputMode::EightBit);
 
     loop {
-        match rustbox.poll_event(Duration::from_millis(1), false) {
+        match rustbox.peek_event(Duration::from_millis(1), false) {
             Ok(rustbox::Event::KeyEvent(key)) => {
                 match key {
                     Key::Char('k') => { break; }
