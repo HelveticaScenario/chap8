@@ -3,6 +3,10 @@
 extern crate rustbox;
 
 #[macro_use]
+extern crate log;
+extern crate log4rs;
+
+#[macro_use]
 extern crate serde_derive;
 
 extern crate rand;
@@ -252,6 +256,9 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
 // cargo run -- ./games/TANK
 
 fn main() {
+    log4rs::init_file("log4rs.yml", Default::default()).unwrap();
+    debug!("A FILE HAPPENED :O :O :O ");
+
     let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
     let mut f = File::open(env::args().nth(1).unwrap()).unwrap();
@@ -271,10 +278,10 @@ fn main() {
     rustbox.set_output_mode(OutputMode::EightBit);
 
     loop {
-        match rustbox.peek_event(Duration::from_millis(0), false) {
+        match rustbox.peek_event(Duration::from_millis(1), false) {
             Ok(rustbox::Event::KeyEvent(key)) => {
                 match key {
-                    Key::Char('q') => { break; }
+                    Key::Char('k') => { break; }
                     _ => { }
                 }
             },
@@ -296,8 +303,6 @@ fn main() {
             [tet0, tet1, tet2, tet3]
         };
 
-        
-
         let inst_name: &str;
 
         match inst[0] {
@@ -307,8 +312,12 @@ fn main() {
                         inst_name = "ret";
                         computer.ret(&inst);
                     },
-                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
-                                inst[0], inst[1], inst[2], inst[3])
+                    _ => {
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
+                    }
                 }
             },
             0x1 => {
@@ -350,9 +359,13 @@ fn main() {
                     0x5 => {
                         inst_name = "sub_vx_vy";
                         computer.sub_vx_vy(&inst);
+                    },
+                    _ => {
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
                     }
-                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
-                                inst[0], inst[1], inst[2], inst[3])
                 }
             },
             0xa => {
@@ -376,28 +389,32 @@ fn main() {
                         inst_name = "add_i_vx";
                         computer.add_i_vx(&inst);
                     },
-                    _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
-                                inst[0], inst[1], inst[2], inst[3])
+                    _ => {
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                                inst[0], inst[1], inst[2], inst[3]);
+                    }
                 }
             },
-            _ => panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
-                        inst[0], inst[1], inst[2], inst[3])
+            _ => {
+                error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        inst[0], inst[1], inst[2], inst[3]);
+                panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        inst[0], inst[1], inst[2], inst[3]);
+            }
         }
-        // print!("inst: ");
-        // for x in &inst {
-        //     print!("{:x}", x);
-        // }
-        // println!(" ({})", inst_name);
+        debug!("inst: ");
+        for x in &inst {
+            debug!("{:x}", x);
+        }
+        debug!(" ({})\n", inst_name);
 
         if should_inc {
             computer.cpu.pc += 2;
         }
 
-        // println!("{:?}", computer.cpu);
-
-        // step on newline
-        // let mut input = String::new();
-        // io::stdin().read_line(&mut input).unwrap();
+        debug!("{:?}\n", computer.cpu);
     }
 }
 

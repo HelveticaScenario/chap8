@@ -10,3 +10,6 @@ serde_yaml = "*"
 serde_derive = "*"
 ansi_term = "*"
 rustbox = "*"
+log = "*"
+log4rs = "*"
+
