@@ -7,8 +7,10 @@ def decode(inst):
     args = nibbles[1:]
 
     if op == 0x0:
-        if args[2] == 0xe:
+        if args[1] == 0xe and args[2] == 0xe:
             return "ret"
+        if args[1] == 0xe and args[2] == 0x0:
+            return "cls"
     if op == 0x1:
         return "jmp_addr({:x}{:x}{:x})".format(*args)
     if op == 0x2:
@@ -26,6 +28,8 @@ def decode(inst):
             return "ld_vx_vy({:x}, {:x})".format(*args[1:3])
         if args[2] == 0x2:
             return "and_vx_vy({:x}, {:x})".format(*args[1:3])
+        if args[2] == 0x4:
+            return "add_vx_vy({:x}, {:x})".format(*args[1:3])
         if args[2] == 0x5:
             return "sub_vx_vy({:x}, {:x})".format(*args[1:3])
     if op == 0xa:
