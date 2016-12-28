@@ -93,6 +93,32 @@ fn combine(arr: &[u8]) -> u16 {
 }
 
 impl Computer {
+    fn write_hex_sprites(&mut self) {
+        let sprites = [
+            0xF0,0x90,0x90,0x90,0xF0, // 0
+            0x20,0x60,0x20,0x20,0x70, // 1
+            0xF0,0x10,0xF0,0x80,0xF0, // 2
+            0xF0,0x10,0xF0,0x10,0xF0, // 3
+            0x90,0x90,0xF0,0x10,0x10, // 4
+            0xF0,0x80,0xF0,0x10,0xF0, // 5
+            0xF0,0x80,0xF0,0x90,0xF0, // 6
+            0xF0,0x10,0x20,0x40,0x40, // 7
+            0xF0,0x90,0xF0,0x90,0xF0, // 8
+            0xF0,0x90,0xF0,0x10,0xF0, // 9
+            0xF0,0x90,0xF0,0x90,0x90, // A
+            0xE0,0x90,0xE0,0x90,0xE0, // B
+            0xF0,0x80,0x80,0x80,0xF0, // C
+            0xE0,0x90,0x90,0x90,0xE0, // D
+            0xF0,0x80,0xF0,0x80,0xF0, // E
+            0xF0,0x80,0xF0,0x80,0x80  // F
+        ];
+        let len = sprites.len();
+        for (i, val) in self.ram[0x000..len].iter_mut().enumerate() {
+            *val = sprites[i];
+        }
+    }
+
+
     fn ld_i_addr(&mut self, inst: &[u8; 4]) {
         let addr = combine(&inst[1..]);
         self.cpu.i = addr;
@@ -268,6 +294,10 @@ impl Computer {
     fn ls_b_vx(&mut self, inst: &[u8; 4]) {
 
     }
+
+    fn lf_f_vx(&mut self, inst: &[u8; 4]) {
+        self.cpu.i = (self.cpu.v[inst[1] as usize] * 5) as u16;
+    }
 }
 
 fn key_char_to_u8(key: Key) -> u8 {
@@ -354,6 +384,8 @@ fn main() {
 
     let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
+    computer.write_hex_sprites();
+
     let mut f = File::open(env::args().nth(1).unwrap()).unwrap();
 
     {
@@ -486,6 +518,10 @@ fn main() {
                     0x0a => {
                         inst_name = "ld_vx_k";
                         computer.ld_vx_k(&inst, &rustbox);
+                    },
+                    0x29 => {
+                        inst_name = "lf_f_vx";
+                        computer.lf_f_vx(&inst);
                     },
                     0x33 => {
                         inst_name = "ls_b_vx";
