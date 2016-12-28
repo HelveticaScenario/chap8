@@ -5,6 +5,7 @@ extern crate rustbox;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
+extern crate log_panics;
 
 #[macro_use]
 extern crate serde_derive;
@@ -14,6 +15,9 @@ extern crate serde;
 extern crate serde_yaml;
 
 extern crate ansi_term;
+
+use std::error::Error;
+use std::default::Default;
 
 use std::fs::File;
 use std::io::Read;
@@ -167,7 +171,9 @@ impl Computer {
 
     fn add_vx_byte(&mut self, inst: &[u8; 4]) {
         let kk = combine(&inst[2..]) as u8;
-        self.cpu.v[inst[1] as usize] += kk;
+        let x = inst[1] as usize;
+        self.cpu.v[x] = self.cpu.v[x].wrapping_add(kk);
+        
     }
 
     fn jmp_addr(&mut self, inst: &[u8; 4]) {
@@ -205,15 +211,125 @@ impl Computer {
     fn sub_vx_vy(&mut self, inst: &[u8; 4]) {
         let x = inst[1] as usize;
         let y = inst[2] as usize;
-        self.cpu.v[x] -= self.cpu.v[y];
+        self.cpu.v[x] = self.cpu.v[x].wrapping_sub(self.cpu.v[y]);
     }
 
     fn add_i_vx(&mut self, inst: &[u8; 4]) {
         let x = inst[1] as usize;
-        self.cpu.i += self.cpu.v[x] as u16;
+        self.cpu.i = self.cpu.i.wrapping_add(self.cpu.v[x] as u16);
+    }
+
+    fn ld_vx_k(&mut self, inst: &[u8; 4], rustbox: &RustBox) {
+        let key_char: Key;
+        loop {
+            match rustbox.poll_event(false) {
+                Ok(rustbox::Event::KeyEvent(key)) => {
+                    match key {
+                        Key::Char('x') |
+                        Key::Char('1') |
+                        Key::Char('2') |
+                        Key::Char('3') |
+                        Key::Char('q') |
+                        Key::Char('w') |
+                        Key::Char('e') |
+                        Key::Char('a') |
+                        Key::Char('s') |
+                        Key::Char('d') |
+                        Key::Char('z') |
+                        Key::Char('c') |
+                        Key::Char('4') |
+                        Key::Char('r') |
+                        Key::Char('f') |
+                        Key::Char('v') => { 
+                            key_char = key;
+                            break;
+                        }
+                        _ => { }
+                    }
+                },
+                Err(e) => {
+                    debug!("{}", e.description());
+                    panic!("{}", e.description());
+                },
+                _ => { }
+            };
+        }
+        let key_code: u8 = key_char_to_u8(key_char);
+        if key_code >= 16 {
+            error!("Something went horribly, horribly wrong and I'm so sorry\n");
+            panic!("Something went horribly, horribly wrong and I'm so sorry\n");
+        }
+        self.cpu.v[inst[1] as usize] = key_code;
+    }
+
+    fn ld_i_vx(&mut self, inst: &[u8; 4]) {
+        for i in 0..inst[1] {
+            self.ram[(self.cpu.i + i as u16) as usize] = self.cpu.v[i as usize];
+        }
+    }
+
+    fn ld_vx_i(&mut self, inst: &[u8; 4]) {
+        for i in 0..inst[1] {
+            self.cpu.v[i as usize] = self.ram[(self.cpu.i + i as u16) as usize];
+        }
     }
 }
 
+fn key_char_to_u8(key: Key) -> u8 {
+    match key {
+        Key::Char('x') => { 
+            0
+        }
+        Key::Char('1') => { 
+            1
+        }
+        Key::Char('2') => { 
+            2
+        }
+        Key::Char('3') => { 
+            3
+        }
+        Key::Char('q') => { 
+            4
+        }
+        Key::Char('w') => { 
+            5
+        }
+        Key::Char('e') => { 
+            6
+        }
+        Key::Char('a') => { 
+            7
+        }
+        Key::Char('s') => { 
+            8
+        }
+        Key::Char('d') => { 
+            9
+        }
+        Key::Char('z') => { 
+            10
+        }
+        Key::Char('c') => { 
+            11
+        }
+        Key::Char('4') => { 
+            12
+        }
+        Key::Char('r') => { 
+            13
+        }
+        Key::Char('f') => { 
+            14
+        }
+        Key::Char('v') => { 
+            15
+        }
+        _ => { 
+            16
+        }
+    }
+}
 
 fn draw_screen(screen: &[u8]) {
 
@@ -257,7 +373,8 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
 
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
-    debug!("A FILE HAPPENED :O :O :O ");
+    log_panics::init();
+    debug!("A FILE HAPPENED :O :O :O \n");
 
     let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
@@ -273,19 +390,19 @@ fn main() {
 
     let mut rustbox = match RustBox::init(Default::default()) {
         Result::Ok(v) => v,
-        Result::Err(e) => panic!("{}", e),
+        Result::Err(e) => panic!("{}\n", e),
     };
     rustbox.set_output_mode(OutputMode::EightBit);
 
     loop {
-        match rustbox.peek_event(Duration::from_millis(1), false) {
+        match rustbox.poll_event(Duration::from_millis(1), false) {
             Ok(rustbox::Event::KeyEvent(key)) => {
                 match key {
                     Key::Char('k') => { break; }
                     _ => { }
                 }
             },
-            Err(e) => panic!("{}", e),
+            Err(e) => panic!("{}\n", e),
             _ => { }
         }
 
@@ -313,9 +430,9 @@ fn main() {
                         computer.ret(&inst);
                     },
                     _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
                     }
                 }
@@ -361,9 +478,9 @@ fn main() {
                         computer.sub_vx_vy(&inst);
                     },
                     _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
                     }
                 }
@@ -389,18 +506,30 @@ fn main() {
                         inst_name = "add_i_vx";
                         computer.add_i_vx(&inst);
                     },
+                    0x0a => {
+                        inst_name = "ld_vx_k";
+                        computer.ld_vx_k(&inst, &rustbox);
+                    },
+                    0x55 => {
+                        inst_name = "ld_i_vx";
+                        computer.ld_i_vx(&inst);
+                    },
+                    0x65 => {
+                        inst_name = "ld_vx_i";
+                        computer.ld_vx_i(&inst);
+                    }
                     _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                                 inst[0], inst[1], inst[2], inst[3]);
                     }
                 }
             },
             _ => {
-                error!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                         inst[0], inst[1], inst[2], inst[3]);
-                panic!("unimplemented instruction: {:x}{:x}{:x}{:x}",
+                panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
                         inst[0], inst[1], inst[2], inst[3]);
             }
         }
