@@ -258,6 +258,18 @@ impl Computer {
             self.cpu.v[i as usize] = self.ram[(self.cpu.i + i as u16) as usize];
         }
     }
+
+    fn cls(&mut self) {
+        let offset = self.ram.len() - 256 - 1;
+        let screen = &mut self.ram[offset..];
+        for v in screen.iter_mut() {
+            *v = 0;
+        }
+    }
+
+    fn ls_b_vx(&mut self, inst: &[u8; 4]) {
+
+    }
 }
 
 fn key_char_to_u8(key: Key) -> u8 {
@@ -412,15 +424,16 @@ fn main() {
         match inst[0] {
             0x0 => {
                 match inst[3] {
+                    0x0 => {
+                        inst_name = "cls";
+                        computer.cls();
+                    }
                     0xe => {
                         inst_name = "ret";
                         computer.ret(&inst);
                     },
                     _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
+                        inst_name = "INVALID";
                     }
                 }
             },
@@ -497,6 +510,10 @@ fn main() {
                         inst_name = "ld_vx_k";
                         computer.ld_vx_k(&inst, &rustbox);
                     },
+                    0x33 => {
+                        inst_name = "ls_b_vx";
+                        computer.ls_b_vx(&inst);
+                    }
                     0x55 => {
                         inst_name = "ld_i_vx";
                         computer.ld_i_vx(&inst);
