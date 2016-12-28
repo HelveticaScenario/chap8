@@ -35,8 +35,17 @@ def decode(inst):
     if op == 0xd:
         return "drw_vx_vy_nibble({:x}, {:x}, {:x})".format(*args)
     if op == 0xf:
+        if args[2] == 0xa:
+            return "ld_vx_k({:x})".format(args[1])
         if args[2] == 0xe:
-            return "add_i_vx({:x})".format(args[1])
+            return "ld_i_vx({:x})".format(args[1])
+        if args[2] == 0x5:
+            return "ld_[i]_vx({:x})".format(args[1])
+        if args[2] == 0x5:
+            return "ld_vx_[i]({:x})".format(args[1])
+        else:
+            print("{:x}{:x} ITS {:x} {:x}".format(inst[0], inst[1], *args[1:3]))
+            return "INVALID"
     else:
         return "INVALID"
 
