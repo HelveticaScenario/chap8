@@ -292,7 +292,11 @@ impl Computer {
     }
 
     fn ls_b_vx(&mut self, inst: &[u8; 4]) {
-
+        let vx = self.cpu.v[inst[1] as usize];
+        let i = self.cpu.i as usize;
+        self.ram[i] = vx / 100;
+        self.ram[i + 1] = (vx % 100) / 10;
+        self.ram[i + 2] = vx % 10;
     }
 
     fn lf_f_vx(&mut self, inst: &[u8; 4]) {

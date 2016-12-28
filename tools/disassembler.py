@@ -39,6 +39,8 @@ def decode(inst):
             return "ld_vx_k({:x})".format(args[1])
         if args[2] == 0xe:
             return "ld_i_vx({:x})".format(args[1])
+        if args[2] == 0x3:
+            return "l_b_vx({:x})".format(args[1])
         if args[2] == 0x5:
             return "ld_[i]_vx({:x})".format(args[1])
         if args[2] == 0x5:
