@@ -364,6 +364,11 @@ impl Computer {
     fn lf_f_vx(&mut self, inst: &[u8; 4]) {
         self.cpu.i = (self.cpu.v[inst[1] as usize] * 5) as u16;
     }
+
+    fn jp_v0_addr(&mut self, inst: &[u8; 4]) {
+        let addr = combine(&inst[1..]);
+        self.cpu.pc = addr + self.cpu.v[0] as u16;
+    }
 }
 
 fn key_char_to_u8(key: Key) -> u8 {
@@ -594,7 +599,11 @@ fn main() {
                 inst_name = "ld_i_addr";
                 computer.ld_i_addr(&inst);
             },
-            // need 0xb
+            0xb => {
+                inst_name = "jp_v0_addr";
+                computer.jp_v0_addr(&inst);
+                should_inc = false;
+            }
             0xc => {
                 inst_name = "rnd_vx_byte";
                 computer.rnd_vx_byte(&inst);
