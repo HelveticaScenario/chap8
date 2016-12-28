@@ -444,6 +444,13 @@ fn draw_screen_rustbox(screen: &[u8], rustbox: &RustBox) {
     rustbox.present();
 }
 
+fn unimplemented_panic(inst: &[u8; 4]) -> ! {
+    error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
+            inst[0], inst[1], inst[2], inst[3]);
+    panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
+            inst[0], inst[1], inst[2], inst[3]);
+}
+
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
     log_panics::init();
@@ -580,12 +587,7 @@ fn main() {
                         inst_name = "shl_vx";
                         computer.shl_vx(&inst);
                     },
-                    _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
-                    }
+                    _ => unimplemented_panic(&inst)
                 }
             },
             0xa => {
@@ -602,7 +604,6 @@ fn main() {
                 computer.drw_vx_vy_nibble(&inst);
                 let screen = &computer.ram[offset..];
                 draw_screen_rustbox(screen, &rustbox);
-                // draw_screen(screen);
             },
             // need exa1
             // need ex9e
@@ -634,21 +635,11 @@ fn main() {
                     0x65 => {
                         inst_name = "ld_vx_i";
                         computer.ld_vx_i(&inst);
-                    }
-                    _ => {
-                        error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
-                        panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                                inst[0], inst[1], inst[2], inst[3]);
-                    }
+                    },
+                    _ => unimplemented_panic(&inst)
                 }
             },
-            _ => {
-                error!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                        inst[0], inst[1], inst[2], inst[3]);
-                panic!("unimplemented instruction: {:x}{:x}{:x}{:x}\n",
-                        inst[0], inst[1], inst[2], inst[3]);
-            }
+            _ => unimplemented_panic(&inst)
         }
         debug!("inst: ");
         for x in &inst {
