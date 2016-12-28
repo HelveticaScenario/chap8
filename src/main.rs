@@ -369,6 +369,10 @@ impl Computer {
         let addr = combine(&inst[1..]);
         self.cpu.pc = addr + self.cpu.v[0] as u16;
     }
+
+    fn ld_vx_dt(&mut self, inst: &[u8; 4]) {
+        self.cpu.v[inst[1] as usize] = self.cpu.dt;
+    }
 }
 
 fn key_char_to_u8(key: Keycode) -> u8 {
@@ -599,7 +603,10 @@ fn main() {
             // need ex9e
             0xf => {
                 match combine(&inst[2..]) {
-                    // need 07
+                    0x07 => {
+                        inst_name = "ld_vx_dt";
+                        computer.ld_vx_dt(&inst);
+                    },
                     0x0a => {
                         inst_name = "ld_vx_k";
                         computer.ld_vx_k(&inst, &mut event_pump);
