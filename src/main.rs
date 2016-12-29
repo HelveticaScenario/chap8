@@ -217,6 +217,14 @@ impl Computer {
         }
     }
 
+    fn sne_vx_vy(&mut self, inst: &[u8; 4]) {
+        let vx = self.cpu.v[inst[1] as usize];
+        let vy = self.cpu.v[inst[2] as usize];
+        if vx != vy {
+            self.cpu.pc += 2;
+        }
+    }
+
     fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
         let screen_start: usize = self.ram.len() - 256 - 1;
         let x: u16 = self.cpu.v[inst[1] as usize] as u16;
@@ -659,6 +667,10 @@ fn main() {
             0x7 => {
                 inst_name = "add_vx_byte";
                 computer.add_vx_byte(&inst);
+            },
+            0x9 => {
+                inst_name = "sne_vx_vy";
+                computer.sne_vx_vy(&inst);
             },
             0x8 => {
                 match inst[3] {
