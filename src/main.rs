@@ -373,6 +373,14 @@ impl Computer {
     fn ld_vx_dt(&mut self, inst: &[u8; 4]) {
         self.cpu.v[inst[1] as usize] = self.cpu.dt;
     }
+
+    fn ld_dt_vx(&mut self, inst: &[u8; 4]) {
+        self.cpu.dt = self.cpu.v[inst[1] as usize];
+    }
+
+    fn ld_st_vx(&mut self, inst: &[u8; 4]) {
+        self.cpu.st = self.cpu.v[inst[1] as usize];
+    }
 }
 
 fn key_char_to_u8(key: Keycode) -> u8 {
@@ -611,8 +619,14 @@ fn main() {
                         inst_name = "ld_vx_k";
                         computer.ld_vx_k(&inst, &mut event_pump);
                     },
-                    // need 15
-                    // need 18
+                    0x15 => {
+                        inst_name = "ld_dt_vx";
+                        computer.ld_dt_vx(&inst);
+                    },
+                    0x18 => {
+                        inst_name = "ld_st_vx";
+                        computer.ld_st_vx(&inst);
+                    },
                     0x1e => {
                         inst_name = "add_i_vx";
                         computer.add_i_vx(&inst);
