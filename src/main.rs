@@ -48,6 +48,8 @@ const WINDOW_HEIGHT: u32 = 320;
 const X_SCALE: u32 = WINDOW_WIDTH / 64;
 const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
 
+const DEFAULT_CYCLES_PER_SECOND: u32 = 30;
+
 struct SquareWave {
     phase_inc: f32,
     phase: f32,
@@ -484,7 +486,6 @@ fn main() {
          (Keycode::V, 15)]
          .iter().cloned().collect();
 
-
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -511,30 +512,30 @@ fn main() {
     };
 
     let buzzing = Arc::new(Mutex::new(false));
-    
 
     let device = {
-        let buzzing = buzzing.clone();
+        let other_buzzing = buzzing.clone();
         audio_subsystem.open_playback(None, &desired_spec, move |spec| {
             // initialize the audio callback
-            let mut buzzing = buzzing.lock().unwrap();
+            let mut still_buzzing = other_buzzing.lock().unwrap();
             SquareWave {
-                phase_inc: 440.0 / spec.freq as f32,
+                phase_inc: if *still_buzzing { 440.0 } else { 880.0 } / spec.freq as f32,
                 phase: 0.0,
-                volume: if *buzzing { 0.25 } else { 0.0 }
+                volume: 0.1
             }
         }).unwrap()
     };
     device.resume();
 
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
-    log_panics::init();
+    // log_panics::init();
 
     let mut computer: Computer = Default::default();
     computer.cpu.pc = 0x200;
     computer.write_hex_sprites();
 
     let mut f = File::open(env::args().nth(1).unwrap()).unwrap();
+    let cycles_per_seconds = env::args().nth(2).unwrap_or(DEFAULT_CYCLES_PER_SECOND.to_string()).parse::<f64>().unwrap();
 
     {
         let end: usize = 0x200 + f.metadata().unwrap().len() as usize;
@@ -542,31 +543,43 @@ fn main() {
         f.read_exact(slice).unwrap();
     }
 
-    let timer = timer::Timer::new();
-    let (st, dt) = (Arc::new(Mutex::new(0u8)), Arc::new(Mutex::new(0u8)));
-    {
-        let (st, dt) = (st.clone(), dt.clone());
-        timer.schedule_with_delay(chrono::Duration::nanoseconds(16666667), move || {
-            {
-                let mut st = st.lock().unwrap();
-                if *st > 0 {
-                    *st = *st - 1;
-                }
-            };
-            {
-                let mut dt = dt.lock().unwrap();
-                if *dt > 0 {
-                    *dt = *dt - 1;
-                }
-            };
+    let delay_timer = timer::Timer::new();
+    let (st, dt) = (Arc::new(Mutex::new(60u8)), Arc::new(Mutex::new(0u8)));
+    // {
+    //     let (st, dt) = (st.clone(), dt.clone());
+    //     delay_timer.schedule_repeating(chrono::Duration::nanoseconds(16666667), move || {
+    //     // delay_timer.schedule_repeating(chrono::Duration::seconds(1), move || {
+    //         {
+    //             let mut st = st.lock().unwrap();
+    //             if *st > 0 {
+    //                 *st = *st - 1;
+    //             }
+    //         };
+    //         {
+    //             let mut dt = dt.lock().unwrap();
+    //             if *dt > 0 {
+    //                 *dt = *dt - 1;
+    //             }
+    //         };
             
-        });
-    }
+    //     });
+    // }
     
+    // let cycle_timer = timer::Timer::new();
+    // let (tx, rx) = channel();
+    // let nanoseconds_per_cycle = (1000000000.0f64 / cycles_per_seconds) as i64;
+    // cycle_timer.schedule_repeating(chrono::Duration::nanoseconds(nanoseconds_per_cycle), move || {
+    //     tx.send(()).unwrap();
+    // });
 
+    // thread::spawn(move|| {
+    //     tx.send(()).unwrap();
+    // });
     let offset = computer.ram.len() - 256 - 1;
 
     'main: loop {
+        // let _ = rx.recv().unwrap();
+
         for event in event_pump.poll_iter() {
             computer.handle_key_event(event, &keymap);
         }
@@ -784,7 +797,7 @@ fn main() {
         debug!("{:?}\n", computer.cpu);
         {
             let mut buzzing = buzzing.lock().unwrap();
-            *buzzing = if computer.cpu.st == 0 { false } else { true }
+            *buzzing = true; //computer.cpu.st != 0;
         }
         
     }
