@@ -25,8 +25,6 @@ use std::env;
 use std::fmt;
 use std::collections::HashMap;
 
-use std::thread;
-use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 
@@ -221,16 +219,19 @@ impl Computer {
 
     fn drw_vx_vy_nibble(&mut self, inst: &[u8; 4]) {
         let screen_start: usize = self.ram.len() - 256 - 1;
-        let x = self.cpu.v[inst[1] as usize];
-        let y = self.cpu.v[inst[2] as usize];
-        let n = inst[3] as u8;
+        let x: u16 = self.cpu.v[inst[1] as usize] as u16;
+        let y: u16 = self.cpu.v[inst[2] as usize] as u16;
+        let n = inst[3] as u16;
         let mut sprite: Vec<u8> = Vec::new();
         sprite.extend_from_slice(&self.ram[(self.cpu.i as usize)..((self.cpu.i+(n as u16)) as usize)]);
-        let offset: u8 = x % 8;
+        let offset: u16 = x % 8;
         let mut collided = false;
         for i in 0..n {
-            let first_byte_i: usize = (((y + i).wrapping_mul(8)) + (x / 8)) as usize + screen_start;
-            let second_byte_i: usize = ((y + i).wrapping_shr(8) + ((x + 8) % 64) / 8) as usize + screen_start;
+            let first_col = x / 8;
+            let first_byte_i: usize = (((y + i).wrapping_mul(8)) + first_col) as usize + screen_start;
+
+            let second_col = (x / 8 + 1) % 8;
+            let second_byte_i: usize = (((y + i).wrapping_mul(8)) + second_col) as usize + screen_start;
 
             let byte: u8 = sprite[i as usize];
             let first_byte: u8=
@@ -520,7 +521,7 @@ fn main() {
         let buzzing = buzzing.clone();
         audio_subsystem.open_playback(None, &desired_spec, move |spec| {
             // initialize the audio callback
-            let mut buzzing = buzzing.lock().unwrap();
+            let buzzing = buzzing.lock().unwrap();
 
             SquareWave {
                 phase_inc: 440.0 / spec.freq as f32,
@@ -589,11 +590,11 @@ fn main() {
         let mut should_inc = true;
 
         {
-            let mut st = st.lock().unwrap();
+            let st = st.lock().unwrap();
             computer.cpu.st = *st;
         }
         {
-            let mut dt = dt.lock().unwrap();
+            let dt = dt.lock().unwrap();
             computer.cpu.dt = *dt;
         }
 
