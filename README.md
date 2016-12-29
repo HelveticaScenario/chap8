@@ -1,2 +1,5 @@
-# chap8
-chip 8 but chappy... slappy... brit-bat, spiderbomb
+# Chap8
+A Chip8 emulator written in Rust!
+
+To run a game from the base directory:
+$ cargo run -- ./games/<GAME>
