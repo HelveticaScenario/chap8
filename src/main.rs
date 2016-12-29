@@ -1,5 +1,8 @@
 #![feature(proc_macro)]
 
+extern crate timer;
+extern crate chrono;
+
 #[macro_use]
 extern crate log;
 extern crate log4rs;
@@ -21,6 +24,11 @@ use std::io::Read;
 use std::env;
 use std::fmt;
 
+use std::thread;
+use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::channel;
+
 extern crate sdl2;
 use sdl2::render::Renderer;
 use sdl2::pixels::Color;
@@ -28,6 +36,7 @@ use sdl2::rect::Rect;
 use sdl2::event::Event;
 use sdl2::EventPump;
 use sdl2::keyboard::Keycode;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
 
 const ON_COLOR: Color = Color::RGB(255, 0, 0);
 const OFF_COLOR: Color = Color::RGB(0, 0, 0);
@@ -37,6 +46,28 @@ const WINDOW_HEIGHT: u32 = 320;
 
 const X_SCALE: u32 = WINDOW_WIDTH / 64;
 const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
+
+struct SquareWave {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32
+}
+
+impl AudioCallback for SquareWave {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        // Generate a square wave
+        for x in out.iter_mut() {
+            *x = match self.phase {
+                0.0...0.5 => self.volume,
+                _ => -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
+    }
+}
+
 
 #[derive(Default, Serialize, Deserialize)]
 struct CPU {
@@ -452,6 +483,30 @@ fn main() {
     renderer.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
+    let audio_subsystem = sdl_context.audio().unwrap();
+
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(1),  // mono
+        samples: None       // default sample size
+    };
+
+    let buzzing = Arc::new(Mutex::new(false));
+    
+
+    let device = {
+        let buzzing = buzzing.clone();
+        audio_subsystem.open_playback(None, &desired_spec, move |spec| {
+            // initialize the audio callback
+            let mut buzzing = buzzing.lock().unwrap();
+            SquareWave {
+                phase_inc: 440.0 / spec.freq as f32,
+                phase: 0.0,
+                volume: if *buzzing { 0.25 } else { 0.0 }
+            }
+        }).unwrap()
+    };
+    device.resume();
 
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
     log_panics::init();
@@ -467,6 +522,28 @@ fn main() {
         let mut slice = &mut computer.ram[0x200..end];
         f.read_exact(slice).unwrap();
     }
+
+    let timer = timer::Timer::new();
+    let (st, dt) = (Arc::new(Mutex::new(0u8)), Arc::new(Mutex::new(0u8)));
+    {
+        let (st, dt) = (st.clone(), dt.clone());
+        timer.schedule_with_delay(chrono::Duration::nanoseconds(16666667), move || {
+            {
+                let mut st = st.lock().unwrap();
+                if *st > 0 {
+                    *st = *st - 1;
+                }
+            };
+            {
+                let mut dt = dt.lock().unwrap();
+                if *dt > 0 {
+                    *dt = *dt - 1;
+                }
+            };
+            
+        });
+    }
+    
 
     let offset = computer.ram.len() - 256 - 1;
 
@@ -485,6 +562,17 @@ fn main() {
         }
 
         let mut should_inc = true;
+
+        {
+            let mut st = st.lock().unwrap();
+            computer.cpu.st = *st;
+        }
+        {
+            let mut dt = dt.lock().unwrap();
+            computer.cpu.dt = *dt;
+        }
+
+        
 
         let inst: [u8; 4] = {
             let inst0 = computer.ram[computer.cpu.pc as usize];
@@ -622,10 +710,20 @@ fn main() {
                     0x15 => {
                         inst_name = "ld_dt_vx";
                         computer.ld_dt_vx(&inst);
+                        {
+                            let mut dt = dt.lock().unwrap();
+                            *dt = computer.cpu.dt;
+                        }
+                        
                     },
                     0x18 => {
                         inst_name = "ld_st_vx";
                         computer.ld_st_vx(&inst);
+                        {
+                            let mut st = st.lock().unwrap();
+                            *st = computer.cpu.st;
+                        }
+                        
                     },
                     0x1e => {
                         inst_name = "add_i_vx";
@@ -663,6 +761,11 @@ fn main() {
         }
 
         debug!("{:?}\n", computer.cpu);
+        {
+            let mut buzzing = buzzing.lock().unwrap();
+            *buzzing = if computer.cpu.st == 0 { false } else { true }
+        }
+        
     }
 }
 
