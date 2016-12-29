@@ -20,6 +20,7 @@ use std::fs::File;
 use std::io::Read;
 use std::env;
 use std::fmt;
+use std::collections::HashMap;
 
 extern crate sdl2;
 use sdl2::render::Renderer;
@@ -74,6 +75,7 @@ impl fmt::Debug for CPU {
 struct Computer {
     ram: [u8; 4096],
     cpu: CPU,
+    keyboard: [bool; 16]
 }
 
 impl Default for Computer {
@@ -81,6 +83,7 @@ impl Default for Computer {
          Computer {
              ram: [0u8; 4096],
              cpu: Default::default(),
+             keyboard: [false; 16]
          }
      }
 }
@@ -118,6 +121,29 @@ impl Computer {
         for (i, val) in self.ram[0x000..len].iter_mut().enumerate() {
             *val = sprites[i];
         }
+    }
+
+    fn handle_key_event(&mut self, event: Event, keymap: &HashMap<Keycode, u8>) -> Option<u8> {
+        let mut keycode = None;
+        match event {
+            Event::KeyDown {keycode: Some(key), ..} => {
+                if key == Keycode::K {
+                    panic!("you pressed k");
+                } else if keymap.contains_key(&key) {
+                    keycode = Some(keymap.get(&key).unwrap().clone());
+                    self.keyboard[keycode.unwrap() as usize] = true;
+                }
+            },
+            Event::KeyUp {keycode: Some(key), ..} => {
+                if keymap.contains_key(&key) {
+                    keycode = Some(keymap.get(&key).unwrap().clone());
+                    self.keyboard[keycode.unwrap() as usize] = false;
+                }
+            },
+            _ => {}
+        }
+
+        return keycode;
     }
 
 
@@ -289,48 +315,30 @@ impl Computer {
         self.cpu.i = self.cpu.i.wrapping_add(self.cpu.v[x] as u16);
     }
 
-    fn ld_vx_k(&mut self, inst: &[u8; 4], event_pump: &mut EventPump) {
-        let key_char: Keycode;
-        'poll: loop {
-            for event in event_pump.poll_iter() {
-                match event {
-                    Event::KeyDown {keycode: Some(key), ..} => {
-                        match key {
-                            Keycode::X |
-                            Keycode::Num1 |
-                            Keycode::Num2 |
-                            Keycode::Num3 |
-                            Keycode::Q |
-                            Keycode::W |
-                            Keycode::E |
-                            Keycode::A |
-                            Keycode::S |
-                            Keycode::D |
-                            Keycode::Z |
-                            Keycode::C |
-                            Keycode::Num4 |
-                            Keycode::R |
-                            Keycode::F |
-                            Keycode::V => { 
-                                key_char = key;
-                                break 'poll;
-                            },
-                            Keycode::K => {
-                                panic!("you pressed k");
-                            },
-                            _ => { }
-                        }
-                    },
-                    _ => continue
+    fn ld_vx_k(&mut self, inst: &[u8; 4], keymap: &HashMap<Keycode, u8>,
+               event_pump: &mut EventPump) {
+        let keycode: u8;
+        loop {
+            let result = event_pump.poll_event();
+            match result {
+                Some(event) => {
+                    let event_key = self.handle_key_event(event, keymap);
+                    match event_key {
+                        Some(key) => {
+                            keycode = key;
+                            break;
+                        },
+                        None => continue
+                    }
                 }
+                None => continue
             }
         }
-        let key_code: u8 = key_char_to_u8(key_char);
-        if key_code >= 16 {
+        if keycode >= 16 {
             error!("Something went horribly, horribly wrong and I'm so sorry\n");
             panic!("Something went horribly, horribly wrong and I'm so sorry\n");
         }
-        self.cpu.v[inst[1] as usize] = key_code;
+        self.cpu.v[inst[1] as usize] = keycode;
     }
 
     fn ld_i_vx(&mut self, inst: &[u8; 4]) {
@@ -373,27 +381,19 @@ impl Computer {
     fn ld_vx_dt(&mut self, inst: &[u8; 4]) {
         self.cpu.v[inst[1] as usize] = self.cpu.dt;
     }
-}
 
-fn key_char_to_u8(key: Keycode) -> u8 {
-    match key {
-        Keycode::X => 0,
-        Keycode::Num1 => 1,
-        Keycode::Num2 => 2,
-        Keycode::Num3 => 3,
-        Keycode::Q => 4,
-        Keycode::W => 5,
-        Keycode::E => 6,
-        Keycode::A => 7,
-        Keycode::S => 8,
-        Keycode::D => 9,
-        Keycode::Z => 10,
-        Keycode::C => 11,
-        Keycode::Num4 => 12,
-        Keycode::R => 13,
-        Keycode::F => 14,
-        Keycode::V => 15,
-        _ => 16
+    fn skp_vx(&mut self, inst: &[u8; 4]) {
+        let vx = self.cpu.v[inst[1] as usize];
+        if self.keyboard[vx as usize] {
+            self.cpu.pc += 2;
+        }
+    }
+
+    fn sknp_vx(&mut self, inst: &[u8; 4]) {
+        let vx = self.cpu.v[inst[1] as usize];
+        if !self.keyboard[vx as usize] {
+            self.cpu.pc += 2;
+        }
     }
 }
 
@@ -426,12 +426,31 @@ fn unimplemented_panic(inst: &[u8; 4]) -> ! {
 }
 
 fn main() {
+    let keymap: HashMap<Keycode, u8> =
+        [(Keycode::X, 0),
+         (Keycode::Num1, 1),
+         (Keycode::Num2, 2),
+         (Keycode::Num3, 3),
+         (Keycode::Q, 4),
+         (Keycode::W, 5),
+         (Keycode::E, 6),
+         (Keycode::A, 7),
+         (Keycode::S, 8),
+         (Keycode::D, 9),
+         (Keycode::Z, 10),
+         (Keycode::C, 11),
+         (Keycode::Num4, 12),
+         (Keycode::R, 13),
+         (Keycode::F, 14),
+         (Keycode::V, 15)]
+         .iter().cloned().collect();
+
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let window =
-        video_subsystem.window("rust-sdl2 demo: Video", WINDOW_WIDTH, WINDOW_HEIGHT)
+        video_subsystem.window("Chap8 - Chip8 Emulator", WINDOW_WIDTH, WINDOW_HEIGHT)
         .position_centered()
         .opengl()
         .build()
@@ -464,16 +483,7 @@ fn main() {
 
     'main: loop {
         for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit {..} => break 'main,
-
-                Event::KeyDown {keycode: Some(keycode), ..} => {
-                    if keycode == Keycode::K {
-                        break 'main
-                    }
-                },
-                _ => continue
-            }
+            computer.handle_key_event(event, &keymap);
         }
 
         let mut should_inc = true;
@@ -599,8 +609,19 @@ fn main() {
                 draw_screen_sdl(screen, &mut renderer);
 
             },
-            // need exa1
-            // need ex9e
+            0xe => {
+                match combine(&inst[2..]) {
+                    0xa1 => {
+                        inst_name = "skp_vx";
+                        computer.skp_vx(&inst);
+                    },
+                    0x9e => {
+                        inst_name = "sknp_vx";
+                        computer.sknp_vx(&inst);
+                    },
+                    _=> unimplemented_panic(&inst)
+                }
+            },
             0xf => {
                 match combine(&inst[2..]) {
                     0x07 => {
@@ -609,7 +630,7 @@ fn main() {
                     },
                     0x0a => {
                         inst_name = "ld_vx_k";
-                        computer.ld_vx_k(&inst, &mut event_pump);
+                        computer.ld_vx_k(&inst, &keymap, &mut event_pump);
                     },
                     // need 15
                     // need 18
