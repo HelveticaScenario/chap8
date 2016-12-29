@@ -235,11 +235,12 @@ impl Computer {
         let offset: u16 = x % 8;
         let mut collided = false;
         for i in 0..n {
+            let y = (y + i) % 32;
             let first_col = x / 8;
-            let first_byte_i: usize = (((y + i).wrapping_mul(8)) + first_col) as usize + screen_start;
+            let first_byte_i: usize = (y.wrapping_mul(8) + first_col) as usize + screen_start;
 
             let second_col = (x / 8 + 1) % 8;
-            let second_byte_i: usize = (((y + i).wrapping_mul(8)) + second_col) as usize + screen_start;
+            let second_byte_i: usize = (y.wrapping_mul(8) + second_col) as usize + screen_start;
 
             let byte: u8 = sprite[i as usize];
             let first_byte: u8=
