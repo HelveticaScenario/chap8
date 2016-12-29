@@ -550,7 +550,7 @@ fn main() {
 
     let delay_timer = timer::Timer::new();
     let (st, dt) = (Arc::new(Mutex::new(60u8)), Arc::new(Mutex::new(0u8)));
-    let delay_gaurd = {
+    let _delay_guard = {
         let (st, dt) = (st.clone(), dt.clone());
         delay_timer.schedule_repeating(chrono::Duration::nanoseconds(16666667), move || {
             {
@@ -571,7 +571,7 @@ fn main() {
     let cycle_timer = timer::Timer::new();
     let (tx, rx) = channel();
     let nanoseconds_per_cycle = (1000000000.0f64 / cycles_per_seconds) as i64;
-    let cycle_gaurd = cycle_timer.schedule_repeating(chrono::Duration::nanoseconds(nanoseconds_per_cycle), move || {
+    let _cycle_guard = cycle_timer.schedule_repeating(chrono::Duration::nanoseconds(nanoseconds_per_cycle), move || {
         tx.send(()).unwrap();
     });
 
