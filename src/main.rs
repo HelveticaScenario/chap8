@@ -46,7 +46,7 @@ const WINDOW_HEIGHT: u32 = 320;
 const X_SCALE: u32 = WINDOW_WIDTH / 64;
 const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
 
-const DEFAULT_CYCLES_PER_SECOND: u32 = 1000;
+const DEFAULT_CYCLES_PER_SECOND: u32 = 512000;
 
 struct SquareWave {
     phase_inc: f32,
@@ -509,7 +509,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut renderer = window.renderer().build().unwrap();
+    let mut renderer = window.renderer().accelerated().build().unwrap();
 
     renderer.set_draw_color(Color::RGB(255, 0, 0));
     renderer.clear();
@@ -584,9 +584,6 @@ fn main() {
         tx.send(()).unwrap();
     });
 
-    // thread::spawn(move|| {
-    //     tx.send(()).unwrap();
-    // });
     let offset = computer.ram.len() - 256 - 1;
 
     'main: loop {
