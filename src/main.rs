@@ -722,11 +722,11 @@ fn main() {
             },
             0xe => {
                 match combine(&inst[2..]) {
-                    0xa1 => {
+                    0x9e => {
                         inst_name = "skp_vx";
                         computer.skp_vx(&inst);
                     },
-                    0x9e => {
+                    0xa1 => {
                         inst_name = "sknp_vx";
                         computer.sknp_vx(&inst);
                     },
