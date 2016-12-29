@@ -48,7 +48,7 @@ const WINDOW_HEIGHT: u32 = 320;
 const X_SCALE: u32 = WINDOW_WIDTH / 64;
 const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
 
-const DEFAULT_CYCLES_PER_SECOND: u32 = 30;
+const DEFAULT_CYCLES_PER_SECOND: u32 = 200;
 
 struct SquareWave {
     phase_inc: f32,
@@ -159,9 +159,12 @@ impl Computer {
     fn handle_key_event(&mut self, event: Event, keymap: &HashMap<Keycode, u8>) -> Option<u8> {
         let mut keycode = None;
         match event {
+            Event::Quit { .. } => {
+                std::process::exit(0);
+            },
             Event::KeyDown {keycode: Some(key), ..} => {
                 if key == Keycode::K {
-                    panic!("you pressed k");
+                    std::process::exit(0);
                 } else if keymap.contains_key(&key) {
                     keycode = Some(keymap.get(&key).unwrap().clone());
                     self.keyboard[keycode.unwrap() as usize] = true;
@@ -514,14 +517,15 @@ fn main() {
     let buzzing = Arc::new(Mutex::new(false));
 
     let device = {
-        let other_buzzing = buzzing.clone();
+        let buzzing = buzzing.clone();
         audio_subsystem.open_playback(None, &desired_spec, move |spec| {
             // initialize the audio callback
-            let mut still_buzzing = other_buzzing.lock().unwrap();
+            let mut buzzing = buzzing.lock().unwrap();
+
             SquareWave {
-                phase_inc: if *still_buzzing { 440.0 } else { 880.0 } / spec.freq as f32,
+                phase_inc: 440.0 / spec.freq as f32,
                 phase: 0.0,
-                volume: 0.1
+                volume: if *buzzing { 0.25 } else { 0.0 } 
             }
         }).unwrap()
     };
@@ -545,32 +549,31 @@ fn main() {
 
     let delay_timer = timer::Timer::new();
     let (st, dt) = (Arc::new(Mutex::new(60u8)), Arc::new(Mutex::new(0u8)));
-    // {
-    //     let (st, dt) = (st.clone(), dt.clone());
-    //     delay_timer.schedule_repeating(chrono::Duration::nanoseconds(16666667), move || {
-    //     // delay_timer.schedule_repeating(chrono::Duration::seconds(1), move || {
-    //         {
-    //             let mut st = st.lock().unwrap();
-    //             if *st > 0 {
-    //                 *st = *st - 1;
-    //             }
-    //         };
-    //         {
-    //             let mut dt = dt.lock().unwrap();
-    //             if *dt > 0 {
-    //                 *dt = *dt - 1;
-    //             }
-    //         };
+    let delay_gaurd = {
+        let (st, dt) = (st.clone(), dt.clone());
+        delay_timer.schedule_repeating(chrono::Duration::nanoseconds(16666667), move || {
+            {
+                let mut st = st.lock().unwrap();
+                if *st > 0 {
+                    *st = *st - 1;
+                }
+            };
+            {
+                let mut dt = dt.lock().unwrap();
+                if *dt > 0 {
+                    *dt = *dt - 1;
+                }
+            };
             
-    //     });
-    // }
+        })
+    };
     
-    // let cycle_timer = timer::Timer::new();
-    // let (tx, rx) = channel();
-    // let nanoseconds_per_cycle = (1000000000.0f64 / cycles_per_seconds) as i64;
-    // cycle_timer.schedule_repeating(chrono::Duration::nanoseconds(nanoseconds_per_cycle), move || {
-    //     tx.send(()).unwrap();
-    // });
+    let cycle_timer = timer::Timer::new();
+    let (tx, rx) = channel();
+    let nanoseconds_per_cycle = (1000000000.0f64 / cycles_per_seconds) as i64;
+    let cycle_gaurd = cycle_timer.schedule_repeating(chrono::Duration::nanoseconds(nanoseconds_per_cycle), move || {
+        tx.send(()).unwrap();
+    });
 
     // thread::spawn(move|| {
     //     tx.send(()).unwrap();
@@ -578,7 +581,7 @@ fn main() {
     let offset = computer.ram.len() - 256 - 1;
 
     'main: loop {
-        // let _ = rx.recv().unwrap();
+        let _ = rx.recv().unwrap();
 
         for event in event_pump.poll_iter() {
             computer.handle_key_event(event, &keymap);
@@ -797,7 +800,7 @@ fn main() {
         debug!("{:?}\n", computer.cpu);
         {
             let mut buzzing = buzzing.lock().unwrap();
-            *buzzing = true; //computer.cpu.st != 0;
+            *buzzing = computer.cpu.st != 0;
         }
         
     }
