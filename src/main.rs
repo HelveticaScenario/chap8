@@ -48,7 +48,7 @@ const WINDOW_HEIGHT: u32 = 320;
 const X_SCALE: u32 = WINDOW_WIDTH / 64;
 const Y_SCALE: u32 = WINDOW_HEIGHT / 32;
 
-const DEFAULT_CYCLES_PER_SECOND: u32 = 200;
+const DEFAULT_CYCLES_PER_SECOND: u32 = 1000;
 
 struct SquareWave {
     phase_inc: f32,
@@ -229,8 +229,8 @@ impl Computer {
         let offset: u8 = x % 8;
         let mut collided = false;
         for i in 0..n {
-            let first_byte_i: usize = (((y + i) * 8) + (x / 8)) as usize + screen_start;
-            let second_byte_i: usize = ((y + i) * 8 + ((x + 8) % 64) / 8) as usize + screen_start;
+            let first_byte_i: usize = (((y + i).wrapping_mul(8)) + (x / 8)) as usize + screen_start;
+            let second_byte_i: usize = ((y + i).wrapping_shr(8) + ((x + 8) % 64) / 8) as usize + screen_start;
 
             let byte: u8 = sprite[i as usize];
             let first_byte: u8=
@@ -471,22 +471,22 @@ fn unimplemented_panic(inst: &[u8; 4]) -> ! {
 
 fn main() {
     let keymap: HashMap<Keycode, u8> =
-        [(Keycode::X, 0),
-         (Keycode::Num1, 1),
-         (Keycode::Num2, 2),
-         (Keycode::Num3, 3),
-         (Keycode::Q, 4),
-         (Keycode::W, 5),
-         (Keycode::E, 6),
-         (Keycode::A, 7),
-         (Keycode::S, 8),
-         (Keycode::D, 9),
-         (Keycode::Z, 10),
-         (Keycode::C, 11),
-         (Keycode::Num4, 12),
-         (Keycode::R, 13),
-         (Keycode::F, 14),
-         (Keycode::V, 15)]
+        [(Keycode::X,    0x0),
+         (Keycode::Num1, 0x1),
+         (Keycode::Num2, 0x2),
+         (Keycode::Num3, 0x3),
+         (Keycode::Q,    0x4),
+         (Keycode::W,    0x5),
+         (Keycode::E,    0x6),
+         (Keycode::A,    0x7),
+         (Keycode::S,    0x8),
+         (Keycode::D,    0x9),
+         (Keycode::Z,    0xa),
+         (Keycode::C,    0xb),
+         (Keycode::Num4, 0xc),
+         (Keycode::R,    0xd),
+         (Keycode::F,    0xe),
+         (Keycode::V,    0xf)]
          .iter().cloned().collect();
 
     let sdl_context = sdl2::init().unwrap();
@@ -564,10 +564,9 @@ fn main() {
                     *dt = *dt - 1;
                 }
             };
-            
         })
     };
-    
+
     let cycle_timer = timer::Timer::new();
     let (tx, rx) = channel();
     let nanoseconds_per_cycle = (1000000000.0f64 / cycles_per_seconds) as i64;
